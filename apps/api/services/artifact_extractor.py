@@ -67,7 +67,7 @@ class ArtifactExtractor:
         routes = run_regex_patterns(root, ROUTE_PATTERNS)
         for pat in FILE_ROUTE_PATTERNS:
             routes.extend(self._find_file_routes(root, pat))
-        return sorted(routes, key=lambda r: r.get("file", r.get("route", "")))
+        return routes
 
     def _find_file_routes(self, root: Path, pat: dict) -> list[dict]:
         """Find routes from file-system conventions (Next.js app/, SvelteKit, etc.)."""
@@ -89,7 +89,7 @@ class ArtifactExtractor:
         results: list[dict] = []
         for pat in COMPONENT_PATTERNS:
             for ext in pat["extensions"]:
-                for f in sorted(root.rglob(f"*{ext}")):
+                for f in root.rglob(f"*{ext}"):
                     if should_skip(f):
                         continue
                     rel = str(f.relative_to(root)).lower()
@@ -101,10 +101,10 @@ class ArtifactExtractor:
         """Find page files from conventional directories."""
         results: list[dict] = []
         for pat in PAGE_PATTERNS:
-            for pages_dir in sorted(root.rglob(pat["dir_name"])):
+            for pages_dir in root.rglob(pat["dir_name"]):
                 if should_skip(pages_dir) or not pages_dir.is_dir():
                     continue
-                for f in sorted(pages_dir.rglob("*")):
+                for f in pages_dir.rglob("*"):
                     if f.is_file() and f.suffix in pat["extensions"]:
                         results.append({
                             "route": "/" + str(f.relative_to(pages_dir).with_suffix("")),
