@@ -1,28 +1,14 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
-import { Skeleton } from "@/components/atoms/display/Skeleton";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/atoms/layout/Collapsible";
-import { useScanResult } from "@/hooks/queries/useScans";
 import type { TaskEvidence } from "@/lib/types";
-import {
-  CheckCircle2,
-  XCircle,
-  ChevronRight,
-  ChevronDown,
-  FileCode,
-  ClipboardList,
-} from "lucide-react";
+import { CheckCircle2, XCircle, ChevronRight, FileCode } from "lucide-react";
 import { useState } from "react";
-
-interface TaskEvidenceTableProps {
-  productId: string;
-}
 
 function ConfidenceBar({ confidence }: { confidence: number }) {
   const pct = Math.round(confidence * 100);
@@ -90,67 +76,4 @@ function EvidenceRow({ evidence }: { evidence: TaskEvidence }) {
   );
 }
 
-function TaskEvidenceTable({ productId }: TaskEvidenceTableProps) {
-  const { data: scanResult, isLoading } = useScanResult(productId);
-  const [expanded, setExpanded] = useState(false);
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" /> Task Verification
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-10" />
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const evidence = (scanResult?.functional_inventory ?? []) as TaskEvidence[];
-
-  if (evidence.length === 0) {
-    return null;
-  }
-
-  const verified = evidence.filter((e) => e.verified);
-  const unverified = evidence.filter((e) => !e.verified);
-
-  return (
-    <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <Card>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Task Verification
-              <Badge variant="secondary" className="ml-auto text-xs">
-                {verified.length}/{evidence.length} verified
-              </Badge>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "" : "-rotate-90"}`}
-              />
-            </CardTitle>
-          </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="space-y-0.5">
-            {verified.map((e) => (
-              <EvidenceRow key={e.task_id} evidence={e} />
-            ))}
-            {unverified.map((e) => (
-              <EvidenceRow key={e.task_id} evidence={e} />
-            ))}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-  );
-}
-
-export { TaskEvidenceTable };
-export type { TaskEvidenceTableProps };
+export { ConfidenceBar, EvidenceRow };

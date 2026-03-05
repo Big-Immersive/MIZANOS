@@ -18,11 +18,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/atoms/layout/Dialog";
-import { useProgressSummary } from "@/hooks/queries/useScans";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/atoms/layout/Collapsible";
+import { EvidenceRow } from "./EvidenceRow";
+import { useProgressSummary, useScanResult } from "@/hooks/queries/useScans";
 import { useTriggerHighLevelScan, useCancelScan } from "@/hooks/mutations/useScanMutations";
 import { useJob } from "@/hooks/queries/useJob";
 import { useQueryClient } from "@tanstack/react-query";
-import { ScanSearch, RefreshCw, GitCommitHorizontal, Clock, XCircle } from "lucide-react";
+import type { TaskEvidence } from "@/lib/types";
+import { ScanSearch, RefreshCw, GitCommitHorizontal, Clock, XCircle, ChevronDown, ClipboardList } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 interface ScanProgressCardProps {
@@ -69,10 +76,12 @@ function SegmentedBar({ summary }: { summary: { verified: number; partial: numbe
 function ScanProgressCard({ productId }: ScanProgressCardProps) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useProgressSummary(productId);
+  const { data: scanResult } = useScanResult(productId);
   const triggerScan = useTriggerHighLevelScan(productId);
   const cancelScan = useCancelScan(productId);
   const [jobId, setJobId] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const prevStatusRef = useRef<string | undefined>(undefined);
 
   // Pick up active job from summary (e.g. page reload while scan runs)
@@ -127,6 +136,9 @@ function ScanProgressCard({ productId }: ScanProgressCardProps) {
 
   const summary = data?.scan_summary as { verified: number; partial: number; no_evidence: number; total_tasks: number } | null;
   const progressPct = data?.progress_pct ?? 0;
+  const evidence = (scanResult?.functional_inventory ?? []) as TaskEvidence[];
+  const verifiedEvidence = evidence.filter((e) => e.verified);
+  const unverifiedEvidence = evidence.filter((e) => !e.verified);
 
   return (
     <>
@@ -226,6 +238,36 @@ function ScanProgressCard({ productId }: ScanProgressCardProps) {
                 </TooltipProvider>
               )}
             </div>
+          )}
+
+          {evidence.length > 0 && (
+            <Collapsible open={evidenceExpanded} onOpenChange={setEvidenceExpanded}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 pt-3 border-t cursor-pointer hover:bg-muted/50 rounded-md px-1 py-2 transition-colors"
+                >
+                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Task Verification</span>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {verifiedEvidence.length}/{evidence.length} verified
+                  </Badge>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${evidenceExpanded ? "" : "-rotate-90"}`}
+                  />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-0.5 pt-1">
+                  {verifiedEvidence.map((e) => (
+                    <EvidenceRow key={e.task_id} evidence={e} />
+                  ))}
+                  {unverifiedEvidence.map((e) => (
+                    <EvidenceRow key={e.task_id} evidence={e} />
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </CardContent>
       </Card>
