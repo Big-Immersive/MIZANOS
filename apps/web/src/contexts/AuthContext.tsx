@@ -65,6 +65,8 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
         .catch(() => {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
           document.cookie = "access_token=; path=/; max-age=0";
         })
         .finally(() => setLoading(false));

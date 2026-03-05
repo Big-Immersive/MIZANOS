@@ -19,6 +19,8 @@ import { PortTaskGenerator } from "./PortTaskGenerator";
 import { DevelopmentHealthSection } from "./DevelopmentHealthSection";
 import { FunctionalSpecSection } from "./FunctionalSpecSection";
 import { ExternalDocumentsOverview } from "./ExternalDocumentsOverview";
+import { ScanProgressCard } from "@/components/molecules/indicators/ScanProgressCard";
+import { TaskEvidenceTable } from "./TaskEvidenceTable";
 import type { ProductStage } from "@/lib/constants";
 import { FileText, Users } from "lucide-react";
 
@@ -143,6 +145,10 @@ function ProductOverview({ productId }: ProductOverviewProps) {
         blockers={blockers}
       />
 
+      {product.repository_url && (
+        <ScanProgressCard productId={productId} />
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -220,6 +226,10 @@ function ProductOverview({ productId }: ProductOverviewProps) {
           repositoryUrl={product.repository_url}
           specificationId={specification?.id}
         />
+      )}
+
+      {product.repository_url && (
+        <TaskEvidenceTable productId={productId} />
       )}
 
       {product.repository_url && (

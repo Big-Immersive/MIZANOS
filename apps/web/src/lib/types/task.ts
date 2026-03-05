@@ -15,6 +15,7 @@ export interface Task {
   estimated_hours: number | null;
   generation_source: string | null;
   claude_code_prompt: string | null;
+  verification_criteria: string | null;
   domain_group: string | null;
   phase: string | null;
   is_draft: boolean;

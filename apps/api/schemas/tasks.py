@@ -19,6 +19,7 @@ class TaskBase(BaseSchema):
     sort_order: int | None = 0
     generation_source: str | None = None
     claude_code_prompt: str | None = None
+    verification_criteria: str | None = None
     domain_group: str | None = None
     phase: str | None = None
     is_draft: bool = False
@@ -45,6 +46,7 @@ class TaskUpdate(BaseSchema):
     sort_order: int | None = None
     generation_source: str | None = None
     claude_code_prompt: str | None = None
+    verification_criteria: str | None = None
     domain_group: str | None = None
     phase: str | None = None
     is_draft: bool | None = None

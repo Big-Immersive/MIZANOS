@@ -149,3 +149,11 @@ export type { GitHubPat, GitHubPatVerifyResult } from "./github-pat";
 export type { TaskComment } from "./task-comment";
 
 export type { Job, JobStatus, JobCreateResponse } from "./job";
+
+export type {
+  ScanSummary,
+  TaskEvidence,
+  ScanResult,
+  ScanHistoryEntry,
+  ProgressSummary,
+} from "./scan";

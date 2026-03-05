@@ -39,6 +39,9 @@ export function clearTokens(): void {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("mizan_auth_token");
+  if (typeof document !== "undefined") {
+    document.cookie = "access_token=; path=/; max-age=0";
+  }
 }
 
 async function refreshAccessToken(): Promise<string> {

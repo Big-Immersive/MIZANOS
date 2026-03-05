@@ -88,7 +88,7 @@ function LoginContent() {
 
           <div className="rounded-xl border bg-card p-6 shadow-sm">
             <LoginForm
-              onSuccess={() => router.push(redirect as never)}
+              onSuccess={() => { window.location.href = redirect; }}
               onForgotPassword={() => router.push("/reset-password")}
             />
           </div>

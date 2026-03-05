@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.models.product import Product
+from apps.api.services.scan_service import ScanService
 from apps.api.services.system_doc_generator import SystemDocGenerator
 
 logger = logging.getLogger(__name__)
@@ -53,10 +54,23 @@ class GitHubWebhookService:
         generator = SystemDocGenerator(self.session)
         docs = await generator.regenerate_from_github(product.id, commit_sha)
 
+        # Auto-trigger high-level progress scan
+        scan_triggered = False
+        try:
+            scan_svc = ScanService(self.session)
+            await scan_svc.trigger_high_level_scan(product.id, "system")
+            scan_triggered = True
+        except Exception:
+            logger.warning(
+                "Auto-scan skipped for product %s (scan may already be running)",
+                product.id,
+            )
+
         return {
             "product_id": str(product.id),
             "docs_regenerated": len(docs),
             "commit_sha": commit_sha,
+            "scan_triggered": scan_triggered,
         }
 
     async def _find_product_by_repo(

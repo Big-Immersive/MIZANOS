@@ -38,6 +38,7 @@ class Task(Base, UUIDMixin, TimestampMixin):
     estimated_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     generation_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     claude_code_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verification_criteria: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     domain_group: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     phase: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_draft: Mapped[bool] = mapped_column(
