@@ -24,6 +24,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/atoms/layout/Collapsible";
 import { EvidenceRow } from "./EvidenceRow";
+import { ScanHistoryList } from "./ScanHistoryList";
 import { useProgressSummary, useScanResult } from "@/hooks/queries/useScans";
 import { useTriggerHighLevelScan, useCancelScan } from "@/hooks/mutations/useScanMutations";
 import { useJob } from "@/hooks/queries/useJob";
@@ -269,6 +270,8 @@ function ScanProgressCard({ productId }: ScanProgressCardProps) {
               </CollapsibleContent>
             </Collapsible>
           )}
+
+          <ScanHistoryList productId={productId} />
         </CardContent>
       </Card>
 
