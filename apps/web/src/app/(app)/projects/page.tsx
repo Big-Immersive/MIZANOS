@@ -49,14 +49,6 @@ export default function ProductsPage() {
   const { isSuperAdmin, isProjectManager } = useRoleVisibility();
   const canCreateProject = isSuperAdmin || isProjectManager;
 
-  const taskCountMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const task of allTasks) {
-      map.set(task.product_id, (map.get(task.product_id) ?? 0) + 1);
-    }
-    return map;
-  }, [allTasks]);
-
   const pmNameMap = useMemo(() => {
     const profileMap = new Map<string, string>();
     for (const p of profiles) profileMap.set(p.id, p.full_name ?? p.email ?? "Unknown");
@@ -206,7 +198,7 @@ export default function ProductsPage() {
             <ProductCard
               key={product.id}
               product={product}
-              taskCount={taskCountMap.get(product.id) ?? 0}
+              taskCount={product.task_count ?? 0}
               pmName={pmNameMap.get(product.id)}
             />
           ))}
@@ -214,7 +206,7 @@ export default function ProductsPage() {
       )}
 
       {!isLoading && filteredProducts.length > 0 && viewMode === "list" && (
-        <ProductTable products={filteredProducts} taskCountMap={taskCountMap} pmNameMap={pmNameMap} />
+        <ProductTable products={filteredProducts} pmNameMap={pmNameMap} />
       )}
 
       {!isLoading && filteredProducts.length === 0 && (

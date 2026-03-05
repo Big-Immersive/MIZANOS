@@ -59,6 +59,7 @@ class ProductResponse(ProductBase):
     created_by_name: str | None = None
     archived_at: datetime | None = None
     tasks_locked: bool = False
+    task_count: int = 0
     created_at: datetime
     updated_at: datetime
 

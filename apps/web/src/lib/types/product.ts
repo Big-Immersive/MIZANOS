@@ -21,6 +21,7 @@ export interface Product {
   created_by_name: string | null;
   archived_at: string | null;
   tasks_locked: boolean;
+  task_count: number;
   created_at: string;
   updated_at: string;
 }

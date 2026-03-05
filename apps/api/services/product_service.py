@@ -14,6 +14,7 @@ from apps.api.models.product import (
     ProductMember,
     ProductPartnerNote,
 )
+from apps.api.models.task import Task
 from apps.api.schemas.products import (
     ManagementNoteCreate,
     PartnerNoteCreate,
@@ -95,6 +96,21 @@ class ProductService(BaseService[Product]):
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)
         result = await self.repo.session.execute(stmt)
         data = list(result.scalars().all())
+
+        # Fetch task counts per product in one query
+        product_ids = [p.id for p in data]
+        task_counts: dict = {}
+        if product_ids:
+            tc_stmt = (
+                select(Task.product_id, func.count(Task.id))
+                .where(Task.product_id.in_(product_ids))
+                .group_by(Task.product_id)
+            )
+            tc_result = await self.repo.session.execute(tc_stmt)
+            task_counts = dict(tc_result.all())
+
+        for product in data:
+            product.task_count = task_counts.get(product.id, 0)
 
         return {
             "data": data,
