@@ -113,6 +113,7 @@ class ScanService:
 
         latest = await self.get_latest_scan_result(product_id)
         summary = latest.gap_analysis if latest and latest.gap_analysis else None
+        active_job_id = await self._get_active_scan_job_id(product_id)
 
         return {
             "product_id": str(product_id),
@@ -120,4 +121,20 @@ class ScanService:
             "last_scan_at": str(latest.created_at) if latest else None,
             "commit_sha": latest.branch if latest else None,
             "scan_summary": summary,
+            "active_job_id": str(active_job_id) if active_job_id else None,
         }
+
+    async def _get_active_scan_job_id(self, product_id: UUID) -> UUID | None:
+        """Return the ID of any pending/running scan job, or None."""
+        stmt = (
+            select(Job.id)
+            .where(
+                Job.product_id == product_id,
+                Job.job_type == "high_level_scan",
+                Job.status.in_(["pending", "running"]),
+            )
+            .order_by(Job.created_at.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

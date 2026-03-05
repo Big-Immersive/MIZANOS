@@ -46,6 +46,7 @@ from apps.api.routers import (
     utilities,
     scans,
 )
+from apps.api.routers import jobs
 from apps.api.routers import (
     external_documents,
     document_folders,
@@ -80,20 +81,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def _cors_headers(request: Request) -> dict[str, str]:
+    """Build CORS headers if the request origin is allowed."""
+    origin = request.headers.get("origin", "")
+    if origin in settings.cors_origins:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
+    return {}
+
+
 @app.exception_handler(StarletteHTTPException)
 async def cors_http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    """Ensure CORS headers are present on error responses."""
-    origin = request.headers.get("origin", "")
-    headers: dict[str, str] = {}
-    if origin in settings.cors_origins:
-        headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
+    """Ensure CORS headers are present on HTTP error responses."""
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=headers,
+        headers=_cors_headers(request),
+    )
+
+
+@app.exception_handler(Exception)
+async def cors_generic_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Ensure CORS headers are present on unhandled 500 errors."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=_cors_headers(request),
     )
 
 
@@ -135,6 +154,7 @@ app.include_router(task_comments.router, prefix="/tasks", tags=["task-comments"]
 app.include_router(specification_sources.router, prefix="/products", tags=["specification-sources"])
 app.include_router(utilities.router, prefix="/utilities", tags=["utilities"])
 app.include_router(scans.router, prefix="/scans", tags=["scans"])
+app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 
 
 # Mount static files for uploaded avatars

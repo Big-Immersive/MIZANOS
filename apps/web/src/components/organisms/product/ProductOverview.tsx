@@ -149,6 +149,10 @@ function ProductOverview({ productId }: ProductOverviewProps) {
         <ScanProgressCard productId={productId} />
       )}
 
+      {product.repository_url && (
+        <TaskEvidenceTable productId={productId} />
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -226,10 +230,6 @@ function ProductOverview({ productId }: ProductOverviewProps) {
           repositoryUrl={product.repository_url}
           specificationId={specification?.id}
         />
-      )}
-
-      {product.repository_url && (
-        <TaskEvidenceTable productId={productId} />
       )}
 
       {product.repository_url && (

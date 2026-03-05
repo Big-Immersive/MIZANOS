@@ -80,3 +80,4 @@ class ProgressSummaryResponse(BaseSchema):
     last_scan_at: str | None = None
     commit_sha: str | None = None
     scan_summary: dict | None = None
+    active_job_id: str | None = None

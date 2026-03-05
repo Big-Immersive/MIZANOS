@@ -45,4 +45,5 @@ export interface ProgressSummary {
   last_scan_at: string | null;
   commit_sha: string | null;
   scan_summary: ScanSummary | null;
+  active_job_id: string | null;
 }

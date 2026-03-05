@@ -21,8 +21,9 @@ import {
 import { useProgressSummary } from "@/hooks/queries/useScans";
 import { useTriggerHighLevelScan, useCancelScan } from "@/hooks/mutations/useScanMutations";
 import { useJob } from "@/hooks/queries/useJob";
+import { useQueryClient } from "@tanstack/react-query";
 import { ScanSearch, RefreshCw, GitCommitHorizontal, Clock, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface ScanProgressCardProps {
   productId: string;
@@ -66,14 +67,32 @@ function SegmentedBar({ summary }: { summary: { verified: number; partial: numbe
 }
 
 function ScanProgressCard({ productId }: ScanProgressCardProps) {
+  const queryClient = useQueryClient();
   const { data, isLoading } = useProgressSummary(productId);
   const triggerScan = useTriggerHighLevelScan(productId);
   const cancelScan = useCancelScan(productId);
   const [jobId, setJobId] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const { data: job } = useJob(jobId);
+  const prevStatusRef = useRef<string | undefined>();
+
+  // Pick up active job from summary (e.g. page reload while scan runs)
+  const activeJobId = jobId ?? data?.active_job_id ?? null;
+  const { data: job } = useJob(activeJobId);
 
   const isScanning = triggerScan.isPending || (job?.status === "pending" || job?.status === "running");
+
+  // When job finishes, refresh the progress summary automatically
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = job?.status;
+    if (!prev || !job?.status) return;
+    const wasActive = prev === "pending" || prev === "running";
+    const nowDone = job.status === "completed" || job.status === "failed";
+    if (wasActive && nowDone) {
+      queryClient.invalidateQueries({ queryKey: ["scans", productId] });
+      setJobId(null);
+    }
+  }, [job?.status, productId, queryClient]);
 
   const handleScan = () => {
     triggerScan.mutate(undefined, {
