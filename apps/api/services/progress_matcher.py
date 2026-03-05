@@ -55,9 +55,8 @@ class ProgressMatcherService:
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_msg},
             ],
-            temperature=0,
+            temperature=0.2,
             max_tokens=llm_cfg.max_tokens,
-            seed=42,
         )
 
         raw = response.choices[0].message.content or ""
@@ -101,10 +100,10 @@ class ProgressMatcherService:
                 "raw_response": raw[:500],
             }
 
-        # Always recompute summary server-side for consistency
-        result["scan_summary"] = _compute_summary(
-            result.get("task_evidence", []), total_tasks,
-        )
+        if "scan_summary" not in result:
+            result["scan_summary"] = _compute_summary(
+                result.get("task_evidence", []), total_tasks,
+            )
         return result
 
 
