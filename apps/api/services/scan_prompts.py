@@ -20,8 +20,13 @@ based on the task title and description.
 3. A task about "Create X API" should map to route definitions, service files, etc.
 4. A task about "Add Y page" should map to page/component files.
 5. A task about "Database model for Z" should map to model definitions.
-6. Be conservative — only mark verified=true if there is strong evidence.
-7. Partial evidence (e.g., model exists but no route) should get a lower confidence.
+6. Be deterministic — given identical inputs, always produce identical outputs.
+
+Confidence scoring rubric (follow strictly):
+- 0.8-1.0 + verified=true: dedicated files, routes, or components exist for this task
+- 0.5-0.79 + verified=false: related files exist but implementation is incomplete
+- 0.3-0.49 + verified=false: only tangential or indirect evidence
+- 0.0-0.29 + verified=false: no meaningful evidence found
 
 Return ONLY valid JSON matching this exact schema — no markdown fences, no explanation:
 """
