@@ -20,3 +20,18 @@ export function useTriggerHighLevelScan(productId: string) {
     },
   });
 }
+
+export function useCancelScan(productId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => scansRepository.cancelScan(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["scans", productId] });
+      toast.success("Scan cancelled");
+    },
+    onError: (error: Error) => {
+      toast.error("Failed to cancel scan: " + error.message);
+    },
+  });
+}

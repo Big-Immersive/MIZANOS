@@ -3,7 +3,7 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.models.audit import RepositoryAnalysis, RepoScanHistory
@@ -42,6 +42,21 @@ class ScanService:
             user_id=user_id,
             product_id=product_id,
         )
+
+    async def cancel_scan(self, product_id: UUID) -> int:
+        """Cancel all pending/running scans for a product. Returns count cancelled."""
+        stmt = (
+            update(Job)
+            .where(
+                Job.product_id == product_id,
+                Job.job_type == "high_level_scan",
+                Job.status.in_(["pending", "running"]),
+            )
+            .values(status="failed", progress_message="Cancelled by user")
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount
 
     async def _check_no_running_scan(self, product_id: UUID) -> None:
         """Raise if a scan is already running for this product."""

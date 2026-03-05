@@ -41,6 +41,17 @@ async def trigger_high_level_scan(
     )
 
 
+@router.post("/{product_id}/cancel")
+async def cancel_scan(
+    product_id: UUID,
+    user: CurrentUser = None,
+    service: ScanService = Depends(_get_service),
+) -> dict:
+    """Cancel any running scan for a product."""
+    count = await service.cancel_scan(product_id)
+    return {"cancelled": count}
+
+
 @router.get(
     "/{product_id}/latest",
     response_model=ScanResultResponse | None,

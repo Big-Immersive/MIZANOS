@@ -12,6 +12,13 @@ export class ScansRepository extends BaseRepository<ScanResult> {
     return response.data;
   }
 
+  async cancelScan(productId: string): Promise<{ cancelled: number }> {
+    const response = await this.client.post<{ cancelled: number }>(
+      `${this.basePath}/${productId}/cancel`,
+    );
+    return response.data;
+  }
+
   async getLatest(productId: string): Promise<ScanResult | null> {
     const response = await this.client.get<ScanResult | null>(
       `${this.basePath}/${productId}/latest`,
