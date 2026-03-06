@@ -38,11 +38,14 @@ class TaskService(BaseService[Task]):
         pillar: str | None = None,
         search: str | None = None,
         include_drafts: bool = False,
+        task_type: str = "task",
         page: int = 1,
         page_size: int = 50,
     ) -> dict:
         """List tasks with optional filtering. Excludes drafts by default."""
-        base = select(Task)
+        base = select(Task).where(Task.task_type == task_type)
+        if task_type == "marketing_task":
+            base = base.where(Task.parent_id.is_(None))
         if not include_drafts:
             base = base.where(Task.is_draft == False)  # noqa: E712
         if product_id:
@@ -107,11 +110,25 @@ class TaskService(BaseService[Task]):
 
         return {"data": data, "total": total, "page": page, "page_size": page_size}
 
-    async def list_drafts(self, product_id: UUID) -> list[Task]:
+    async def list_subtasks(self, parent_id: UUID) -> list[Task]:
+        """List subtasks for a parent task."""
+        stmt = (
+            select(Task)
+            .where(Task.parent_id == parent_id)
+            .order_by(Task.sort_order, Task.created_at)
+        )
+        result = await self.repo.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_drafts(self, product_id: UUID, task_type: str = "task") -> list[Task]:
         """List draft tasks for a product."""
         stmt = (
             select(Task)
-            .where(Task.product_id == product_id, Task.is_draft == True)  # noqa: E712
+            .where(
+                Task.product_id == product_id,
+                Task.is_draft == True,  # noqa: E712
+                Task.task_type == task_type,
+            )
             .order_by(Task.created_at.desc())
         )
         result = await self.repo.session.execute(stmt)
@@ -234,10 +251,23 @@ class TaskService(BaseService[Task]):
         return {"updated_count": len(updated), "task_ids": updated}
 
     async def create_task(self, data: TaskCreate, user: AuthenticatedUser) -> Task:
-        """Create a new task. Engineers are auto-assigned to self."""
+        """Create a new task or bug. Engineers are auto-assigned for tasks.
+        Anyone can create bugs (no authorization gating).
+        """
         task_data = data.model_dump()
         task_data["created_by"] = user.profile_id
-        if not self._can_manage_tasks(user):
+        task_type = task_data.get("task_type", "task")
+        is_bug = task_type == "bug"
+        is_marketing = task_type == "marketing_task"
+        if is_bug:
+            task_data.setdefault("status", "reported")
+        elif is_marketing:
+            task_data.setdefault("status", "planned")
+            if task_data.get("parent_id"):
+                parent = await self.get_or_404(task_data["parent_id"])
+                if parent.task_type != "marketing_task" or parent.parent_id is not None:
+                    raise bad_request("Subtasks can only be added to top-level marketing tasks")
+        elif not self._can_manage_tasks(user):
             task_data["assignee_id"] = user.profile_id
         if task_data.get("assignee_id"):
             await self._validate_assignee(task_data["assignee_id"])
@@ -317,6 +347,9 @@ class TaskService(BaseService[Task]):
                 "Only superadmins and project managers can delete active tasks"
             )
 
+        subtasks = await self.list_subtasks(task_id)
+        for sub in subtasks:
+            await self._clear_task_references(sub.id)
         await self._clear_task_references(task_id)
         await self.repo.delete(task)
 

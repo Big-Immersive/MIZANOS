@@ -66,6 +66,10 @@ function ProductRow({ product, taskCount = 0, pmName }: ProductRowProps) {
         {taskCount}
       </span>
 
+      <span className="w-[60px] shrink-0 text-xs font-mono tabular-nums text-right text-muted-foreground">
+        {(product.bug_count ?? 0) > 0 ? `${product.bugs_fixed_count ?? 0}/${product.bug_count}` : "—"}
+      </span>
+
       <span className="w-[100px] shrink-0 flex items-center gap-2">
         <div className="h-1.5 flex-1 bg-secondary rounded-full overflow-hidden">
           <div

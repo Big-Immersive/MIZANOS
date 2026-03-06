@@ -28,12 +28,16 @@ const PRIORITY_DOT: Record<TaskPriority, string> = {
   low: "bg-muted-foreground",
   medium: "bg-status-warning",
   high: "bg-status-critical",
+  critical: "bg-orange-500",
+  production_bug: "bg-purple-500",
 };
 
 const PRIORITY_LABEL: Record<TaskPriority, string> = {
   low: "Low",
   medium: "Medium",
   high: "High",
+  critical: "Critical",
+  production_bug: "Prod Issue",
 };
 
 /* ------------------------------------------------------------------ */

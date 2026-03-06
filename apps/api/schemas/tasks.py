@@ -22,6 +22,8 @@ class TaskBase(BaseSchema):
     verification_criteria: str | None = None
     domain_group: str | None = None
     phase: str | None = None
+    task_type: str = "task"
+    parent_id: UUID | None = None
     is_draft: bool = False
 
 
@@ -49,6 +51,7 @@ class TaskUpdate(BaseSchema):
     verification_criteria: str | None = None
     domain_group: str | None = None
     phase: str | None = None
+    task_type: str | None = None
     is_draft: bool | None = None
     approved_by: UUID | None = None
     approved_at: datetime | None = None
@@ -61,6 +64,9 @@ class TaskResponse(TaskBase):
     product_id: UUID
     assignee_id: UUID | None = None
     created_by: UUID | None = None
+    task_type: str = "task"
+    parent_id: UUID | None = None
+    subtask_count: int = 0
     is_draft: bool
     approved_by: UUID | None = None
     approved_at: datetime | None = None

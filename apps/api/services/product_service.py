@@ -97,20 +97,44 @@ class ProductService(BaseService[Product]):
         result = await self.repo.session.execute(stmt)
         data = list(result.scalars().all())
 
-        # Fetch task counts per product in one query
+        # Fetch task counts per product (type='task' only)
         product_ids = [p.id for p in data]
         task_counts: dict = {}
+        bug_counts: dict = {}
+        bugs_fixed: dict = {}
         if product_ids:
             tc_stmt = (
                 select(Task.product_id, func.count(Task.id))
-                .where(Task.product_id.in_(product_ids))
+                .where(Task.product_id.in_(product_ids), Task.task_type == "task")
                 .group_by(Task.product_id)
             )
             tc_result = await self.repo.session.execute(tc_stmt)
             task_counts = dict(tc_result.all())
 
+            bc_stmt = (
+                select(Task.product_id, func.count(Task.id))
+                .where(Task.product_id.in_(product_ids), Task.task_type == "bug")
+                .group_by(Task.product_id)
+            )
+            bc_result = await self.repo.session.execute(bc_stmt)
+            bug_counts = dict(bc_result.all())
+
+            bf_stmt = (
+                select(Task.product_id, func.count(Task.id))
+                .where(
+                    Task.product_id.in_(product_ids),
+                    Task.task_type == "bug",
+                    Task.status.in_(["fixed", "verified", "live"]),
+                )
+                .group_by(Task.product_id)
+            )
+            bf_result = await self.repo.session.execute(bf_stmt)
+            bugs_fixed = dict(bf_result.all())
+
         for product in data:
             product.task_count = task_counts.get(product.id, 0)
+            product.bug_count = bug_counts.get(product.id, 0)
+            product.bugs_fixed_count = bugs_fixed.get(product.id, 0)
 
         return {
             "data": data,

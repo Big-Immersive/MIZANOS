@@ -23,6 +23,7 @@ import {
   FolderGit2,
   BookOpen,
   Users,
+  Bug,
 } from "lucide-react";
 
 interface ProductTabConfig {
@@ -40,6 +41,7 @@ interface ProductTabsProps {
   teamContent?: ReactNode;
   specContent?: ReactNode;
   tasksContent?: ReactNode;
+  bugsContent?: ReactNode;
   documentsContent?: ReactNode;
   auditContent?: ReactNode;
   deploymentContent?: ReactNode;
@@ -63,6 +65,7 @@ function ProductTabs({
   teamContent,
   specContent,
   tasksContent,
+  bugsContent,
   documentsContent,
   auditContent,
   deploymentContent,
@@ -109,6 +112,12 @@ function ProductTabs({
       content: tasksContent,
     },
     {
+      value: "bugs",
+      label: "Bugs",
+      icon: <Bug className="h-4 w-4" />,
+      content: bugsContent,
+    },
+    {
       value: "documents",
       label: "Documents",
       icon: <FolderOpen className="h-4 w-4" />,
@@ -119,6 +128,12 @@ function ProductTabs({
       label: "System Docs",
       icon: <BookOpen className="h-4 w-4" />,
       content: systemDocsContent,
+    },
+    {
+      value: "marketing",
+      label: "Marketing",
+      icon: <Megaphone className="h-4 w-4" />,
+      content: marketingContent,
     },
     {
       value: "audit",
@@ -155,12 +170,6 @@ function ProductTabs({
       label: "Features",
       icon: <Layers className="h-4 w-4" />,
       content: featuresContent,
-    },
-    {
-      value: "marketing",
-      label: "Marketing",
-      icon: <Megaphone className="h-4 w-4" />,
-      content: marketingContent,
     },
     {
       value: "sources",

@@ -22,18 +22,17 @@ import { CommentThread } from "@/components/molecules/comments/CommentThread";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
 import { useUpdateTask, useDeleteTask } from "@/hooks/mutations/useTaskMutations";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
-import type { KanbanTask, TaskStatus, PillarType, TaskPriority, ProductMember } from "@/lib/types";
+import type { KanbanTask, PillarType, TaskPriority, ProductMember } from "@/lib/types";
 
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   pillar: z.enum(["business", "marketing", "development", "product"]),
-  priority: z.enum(["low", "medium", "high"]),
-  status: z.enum(["backlog", "in_progress", "review", "done", "live", "cancelled"] as const),
+  priority: z.enum(["low", "medium", "high", "critical", "production_bug"]),
+  status: z.string(),
   due_date: z.string().optional(),
   assignee_id: z.string().optional(),
 });
-
 type TaskFormValues = z.infer<typeof taskSchema>;
 
 const PILLAR_OPTIONS = [
@@ -42,14 +41,14 @@ const PILLAR_OPTIONS = [
   { value: "development", label: "Development" },
   { value: "product", label: "Product" },
 ];
-
 const PRIORITY_OPTIONS = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
+  { value: "critical", label: "Critical" },
+  { value: "production_bug", label: "Prod Issue" },
 ];
-
-const STATUS_OPTIONS = [
+const TASK_STATUS_OPTIONS = [
   { value: "backlog", label: "Backlog" },
   { value: "in_progress", label: "In Progress" },
   { value: "review", label: "Review" },
@@ -57,12 +56,30 @@ const STATUS_OPTIONS = [
   { value: "live", label: "Live" },
   { value: "cancelled", label: "Cancelled" },
 ];
+const MARKETING_TASK_STATUS_OPTIONS = [
+  { value: "planned", label: "Planned" },
+  { value: "in_execution", label: "In Execution" },
+  { value: "completed", label: "Completed" },
+];
+const BUG_STATUS_OPTIONS = [
+  { value: "reported", label: "Reported" },
+  { value: "triaging", label: "Triaging" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "fixed", label: "Fixed" },
+  { value: "verified", label: "Verified" },
+  { value: "reopened", label: "Reopened" },
+  { value: "wont_fix", label: "Won't Fix" },
+  { value: "live", label: "Live" },
+];
 
 interface TaskDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task: KanbanTask | null;
   productId: string;
+  taskType?: "task" | "bug" | "marketing_task";
+  updateMutation?: ReturnType<typeof useUpdateTask>;
+  deleteMutation?: ReturnType<typeof useDeleteTask>;
 }
 
 export function TaskDetailDrawer({
@@ -70,10 +87,18 @@ export function TaskDetailDrawer({
   onOpenChange,
   task,
   productId,
+  taskType = "task",
+  updateMutation,
+  deleteMutation,
 }: TaskDetailDrawerProps) {
   const { data: members = [] } = useProductMembers(productId);
-  const updateTask = useUpdateTask(productId);
-  const deleteTask = useDeleteTask(productId);
+  const defaultUpdate = useUpdateTask(productId);
+  const defaultDelete = useDeleteTask(productId);
+  const updateTask = updateMutation ?? defaultUpdate;
+  const deleteTask = deleteMutation ?? defaultDelete;
+  const isBug = taskType === "bug";
+  const isMarketing = taskType === "marketing_task";
+  const statusOptions = isBug ? BUG_STATUS_OPTIONS : isMarketing ? MARKETING_TASK_STATUS_OPTIONS : TASK_STATUS_OPTIONS;
   const { user } = useAuth();
   const { isAdmin, isProjectManager } = useRoleVisibility();
   const canManageTasks = isAdmin || isProjectManager;
@@ -120,28 +145,11 @@ export function TaskDetailDrawer({
 
   const onFormSubmit = (values: TaskFormValues) => {
     if (!task) return;
+    const base = { id: task.id, status: values.status };
+    const details = { title: values.title, description: values.description ?? null, pillar: values.pillar, priority: values.priority, due_date: values.due_date || null };
     const payload = canManageTasks
-      ? {
-          id: task.id,
-          title: values.title,
-          description: values.description ?? null,
-          pillar: values.pillar,
-          priority: values.priority,
-          status: values.status,
-          due_date: values.due_date || null,
-          assignee_id: values.assignee_id === "__none__" ? null : (values.assignee_id ?? null),
-        }
-      : isCreator
-        ? {
-            id: task.id,
-            title: values.title,
-            description: values.description ?? null,
-            pillar: values.pillar,
-            priority: values.priority,
-            status: values.status,
-            due_date: values.due_date || null,
-          }
-        : { id: task.id, status: values.status };
+      ? { ...base, ...details, assignee_id: values.assignee_id === "__none__" ? null : (values.assignee_id ?? null) }
+      : isCreator ? { ...base, ...details } : base;
     updateTask.mutate(payload, { onSuccess: () => onOpenChange(false) });
   };
 
@@ -156,8 +164,8 @@ export function TaskDetailDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-[600px] w-full flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader className="px-6 pt-6 pb-2">
-          <SheetTitle>Task Details</SheetTitle>
-          <SheetDescription className="sr-only">Edit task details and view comments</SheetDescription>
+          <SheetTitle>{isBug ? "Bug Details" : "Task Details"}</SheetTitle>
+          <SheetDescription className="sr-only">Edit {isBug ? "bug" : "task"} details and view comments</SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
@@ -190,17 +198,17 @@ export function TaskDetailDrawer({
               />
             )}
 
-            <div className={canEditDetails ? "grid grid-cols-3 gap-3" : ""}>
+            <div className={canEditDetails ? `grid ${isMarketing ? "grid-cols-2" : "grid-cols-3"} gap-3` : ""}>
               {canEditDetails && (
                 <>
-                  <SelectField label="Vertical" placeholder="Vertical" options={PILLAR_OPTIONS} value={currentPillar} onValueChange={(v) => setValue("pillar", v as PillarType)} />
+                  {!isMarketing && <SelectField label="Vertical" placeholder="Vertical" options={PILLAR_OPTIONS} value={currentPillar} onValueChange={(v) => setValue("pillar", v as PillarType)} />}
                   <SelectField label="Priority" placeholder="Priority" options={PRIORITY_OPTIONS} value={currentPriority} onValueChange={(v) => setValue("priority", v as TaskPriority)} />
                 </>
               )}
               <SelectField
                 label="Status"
                 placeholder="Status"
-                options={STATUS_OPTIONS}
+                options={statusOptions}
                 value={currentStatus}
                 onValueChange={(v) => {
                   if (isUnassigned && v !== "backlog" && v !== "cancelled") {
@@ -208,7 +216,7 @@ export function TaskDetailDrawer({
                     setTimeout(() => setAssignWarning(false), 3000);
                     return;
                   }
-                  setValue("status", v as TaskStatus);
+                  setValue("status", v);
                 }}
               />
             </div>
@@ -277,20 +285,13 @@ export function TaskDetailDrawer({
 }
 
 function TaskMetaInfo({ task, members }: { task: KanbanTask; members: ProductMember[] }) {
-  const creatorName = useMemo(() => {
-    if (!task.createdBy) return null;
-    const member = members.find((m) => m.profile_id === task.createdBy);
-    return member?.profile?.full_name ?? member?.profile?.email ?? null;
-  }, [task.createdBy, members]);
-
-  const createdDate = new Date(task.createdAt).toLocaleDateString("en-US", {
-    year: "numeric", month: "short", day: "numeric",
-  });
-
+  const creator = task.createdBy ? members.find((m) => m.profile_id === task.createdBy) : null;
+  const name = creator?.profile?.full_name ?? creator?.profile?.email ?? null;
+  const date = new Date(task.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   return (
     <div className="flex items-center gap-3 text-xs text-muted-foreground border-t pt-3">
-      {creatorName && <span>Created by <span className="font-medium text-foreground">{creatorName}</span></span>}
-      <span>on {createdDate}</span>
+      {name && <span>Created by <span className="font-medium text-foreground">{name}</span></span>}
+      <span>on {date}</span>
     </div>
   );
 }

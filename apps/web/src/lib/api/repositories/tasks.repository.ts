@@ -29,7 +29,20 @@ export class TasksRepository extends BaseRepository<Task> {
   protected readonly basePath = "/tasks";
 
   async getByProduct(productId: string, params?: QueryParams): Promise<PaginatedResponse<Task>> {
-    return this.getAll({ ...params, product_id: productId });
+    return this.getAll({ ...params, product_id: productId, task_type: "task" });
+  }
+
+  async getBugsByProduct(productId: string, params?: QueryParams): Promise<PaginatedResponse<Task>> {
+    return this.getAll({ ...params, product_id: productId, task_type: "bug" });
+  }
+
+  async getMarketingTasksByProduct(productId: string, params?: QueryParams): Promise<PaginatedResponse<Task>> {
+    return this.getAll({ ...params, product_id: productId, task_type: "marketing_task" });
+  }
+
+  async getSubtasks(parentId: string): Promise<Task[]> {
+    const response = await this.client.get<Task[]>(`${this.basePath}/${parentId}/subtasks`);
+    return response.data;
   }
 
   async getByAssignee(assigneeId: string, params?: QueryParams): Promise<PaginatedResponse<Task>> {

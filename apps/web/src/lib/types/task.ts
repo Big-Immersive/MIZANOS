@@ -18,6 +18,9 @@ export interface Task {
   verification_criteria: string | null;
   domain_group: string | null;
   phase: string | null;
+  task_type: string;
+  parent_id: string | null;
+  subtask_count: number;
   is_draft: boolean;
   approved_by: string | null;
   approved_at: string | null;

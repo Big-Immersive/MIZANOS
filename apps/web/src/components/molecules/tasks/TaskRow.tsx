@@ -3,7 +3,7 @@
 import { Badge } from "@/components/atoms/display/Badge";
 import { BaseCheckbox } from "@/components/atoms/inputs/BaseCheckbox";
 import { ClaudeCodePrompt } from "@/components/molecules/tasks/ClaudeCodePrompt";
-import { TASK_STATUS_DISPLAY, TASK_PRIORITY_COLORS } from "@/lib/constants";
+import { TASK_STATUS_DISPLAY, TASK_PRIORITY_COLORS, type TaskStatusConfig } from "@/lib/constants";
 import type { Task } from "@/lib/types";
 import { MessageSquare, User } from "lucide-react";
 
@@ -13,10 +13,13 @@ interface TaskRowProps {
   assigneeName?: string;
   onToggle: () => void;
   onClick: () => void;
+  statusDisplay?: Record<string, TaskStatusConfig>;
 }
 
-export function TaskRow({ task, selected, assigneeName, onToggle, onClick }: TaskRowProps) {
-  const statusConfig = TASK_STATUS_DISPLAY[task.status ?? "backlog"] ?? TASK_STATUS_DISPLAY.backlog;
+export function TaskRow({ task, selected, assigneeName, onToggle, onClick, statusDisplay }: TaskRowProps) {
+  const display = statusDisplay ?? TASK_STATUS_DISPLAY;
+  const fallbackKey = statusDisplay ? Object.keys(display)[0] : "backlog";
+  const statusConfig = display[task.status ?? fallbackKey] ?? display[fallbackKey];
   const StatusIcon = statusConfig.icon;
 
   return (

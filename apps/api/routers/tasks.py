@@ -44,6 +44,7 @@ async def list_tasks(
     priority: str | None = None,
     pillar: str | None = None,
     search: str | None = None,
+    task_type: str = Query("task"),
     include_drafts: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
@@ -55,6 +56,7 @@ async def list_tasks(
         product_id=product_id, assignee_id=assignee_id, pm_id=pm_id,
         member_id=member_id,
         status=status, priority=priority, pillar=pillar, search=search,
+        task_type=task_type,
         include_drafts=include_drafts, page=page, page_size=page_size,
     )
 
@@ -141,6 +143,17 @@ async def bulk_reject_tasks(
     """Reject/cancel multiple tasks. PM/superadmin only."""
     results = await service.bulk_reject_tasks(body.task_ids, user)
     return {"results": results}
+
+
+@router.get("/{task_id}/subtasks", response_model=list[TaskResponse])
+async def list_subtasks(
+    task_id: UUID,
+    user: CurrentUser = None,
+    service: TaskService = Depends(get_service),
+):
+    """List subtasks for a parent task."""
+    await service.get_or_404(task_id)
+    return await service.list_subtasks(task_id)
 
 
 @router.get("/{task_id}", response_model=TaskResponse)

@@ -60,6 +60,8 @@ class ProductResponse(ProductBase):
     archived_at: datetime | None = None
     tasks_locked: bool = False
     task_count: int = 0
+    bug_count: int = 0
+    bugs_fixed_count: int = 0
     created_at: datetime
     updated_at: datetime
 

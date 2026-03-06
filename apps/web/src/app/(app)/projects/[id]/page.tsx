@@ -25,6 +25,7 @@ import { FeaturesTab } from "@/components/organisms/product/FeaturesTab";
 import { MarketingTab } from "@/components/organisms/marketing/MarketingTab";
 import { SourcesTab } from "@/components/organisms/product/SourcesTab";
 import { SystemDocsTab } from "@/components/organisms/product/SystemDocsTab";
+import { BugsTab } from "@/components/organisms/product/BugsTab";
 import { ProductSettingsDialog } from "@/components/organisms/product/ProductSettingsDialog";
 import { LinkGitHubDialog } from "@/components/organisms/product/LinkGitHubDialog";
 import { GitHubLinkBanner } from "@/components/molecules/github/GitHubLinkBanner";
@@ -150,6 +151,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         teamContent={<ProductTeamTab productId={id} />}
         specContent={specContent}
         tasksContent={<TasksViewToggle productId={id} openTaskId={taskParam ?? undefined} />}
+        bugsContent={<BugsTab productId={id} />}
         documentsContent={documentsContent}
         auditContent={<AuditHistoryList productId={id} />}
         deploymentContent={

@@ -59,7 +59,7 @@ async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:
         await jctx.update_progress(job_id, 50, "Loading project tasks")
         task_svc = TaskService(session)
         tasks_result = await task_svc.list_tasks(
-            product_id=product_id, page_size=500,
+            product_id=product_id, page_size=500, task_type="task",
         )
         task_dicts = [_serialize_task(t) for t in tasks_result["data"]]
 

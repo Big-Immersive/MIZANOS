@@ -11,7 +11,7 @@ import {
 } from "@/components/atoms/inputs/BaseSelect";
 import { SearchableSelect } from "@/components/molecules/forms/SearchableSelect";
 import { Button } from "@/components/molecules/buttons/Button";
-import { TASK_STATUSES, TASK_PRIORITIES, TASK_PILLARS, TASK_STATUS_DISPLAY } from "@/lib/constants";
+import { TASK_STATUSES, TASK_PRIORITIES, TASK_PILLARS, TASK_STATUS_DISPLAY, type TaskStatusConfig } from "@/lib/constants";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils/cn";
 import { Search, Filter, X, User } from "lucide-react";
@@ -37,6 +37,11 @@ interface TasksFilterBarProps {
   pmProfiles: Profile[];
   hasActiveFilters: boolean;
   onClearFilters: () => void;
+  statusOptions?: readonly string[];
+  statusDisplayMap?: Record<string, TaskStatusConfig>;
+  searchPlaceholder?: string;
+  myItemsLabel?: string;
+  hidePillar?: boolean;
 }
 
 export function TasksFilterBar({
@@ -59,6 +64,11 @@ export function TasksFilterBar({
   pmProfiles,
   hasActiveFilters,
   onClearFilters,
+  statusOptions,
+  statusDisplayMap,
+  searchPlaceholder,
+  myItemsLabel,
+  hidePillar,
 }: TasksFilterBarProps) {
   const { user } = useAuth();
   const myTasksActive = assigneeFilter === user?.profile_id;
@@ -93,7 +103,7 @@ export function TasksFilterBar({
       <div className="relative flex-1 min-w-[160px] max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <BaseInput
-          placeholder="Search tasks..."
+          placeholder={searchPlaceholder ?? "Search tasks..."}
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value)}
           className="pl-9 bg-card"
@@ -114,7 +124,7 @@ export function TasksFilterBar({
         onClick={() => onAssigneeChange(myTasksActive ? "all" : (user?.profile_id ?? "all"))}
         className="text-xs shrink-0"
       >
-        <User className="h-3 w-3 mr-1" /> My Tasks
+        <User className="h-3 w-3 mr-1" /> {myItemsLabel ?? "My Tasks"}
       </Button>
 
       <div className="w-[150px] shrink-0">
@@ -157,8 +167,8 @@ export function TasksFilterBar({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Status</SelectItem>
-          {TASK_STATUSES.map((s) => (
-            <SelectItem key={s} value={s}>{TASK_STATUS_DISPLAY[s].label}</SelectItem>
+          {(statusOptions ?? TASK_STATUSES).map((s) => (
+            <SelectItem key={s} value={s}>{(statusDisplayMap ?? TASK_STATUS_DISPLAY)[s]?.label ?? s}</SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -175,17 +185,19 @@ export function TasksFilterBar({
         </SelectContent>
       </Select>
 
-      <Select value={pillarFilter} onValueChange={onPillarChange}>
-        <SelectTrigger className={cn("w-[130px] shrink-0 bg-card", pillarFilter !== "all" && "border-primary/30")}>
-          <SelectValue placeholder="Vertical" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Verticals</SelectItem>
-          {TASK_PILLARS.map((p) => (
-            <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!hidePillar && (
+        <Select value={pillarFilter} onValueChange={onPillarChange}>
+          <SelectTrigger className={cn("w-[130px] shrink-0 bg-card", pillarFilter !== "all" && "border-primary/30")}>
+            <SelectValue placeholder="Vertical" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Verticals</SelectItem>
+            {TASK_PILLARS.map((p) => (
+              <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {hasActiveFilters && (
         <Button variant="ghost" size="sm" onClick={onClearFilters} className="text-muted-foreground hover:text-foreground">

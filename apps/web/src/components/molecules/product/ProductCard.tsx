@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import type { Product } from "@/lib/types";
-import { ClipboardList, UserCircle } from "lucide-react";
+import { Bug, ClipboardList, UserCircle } from "lucide-react";
 
 interface ProductCardProps {
   product: Product;
@@ -36,6 +36,12 @@ function ProductCard({ product, taskCount = 0, pmName }: ProductCardProps) {
           <ClipboardList className="h-3 w-3" />
           {taskCount} {taskCount === 1 ? "task" : "tasks"}
         </span>
+        {(product.bug_count ?? 0) > 0 && (
+          <span className="flex items-center gap-1">
+            <Bug className="h-3 w-3" />
+            {product.bugs_fixed_count ?? 0}/{product.bug_count} fixed
+          </span>
+        )}
         {pmName && (
           <span className="flex items-center gap-1 truncate">
             <UserCircle className="h-3 w-3 shrink-0" />

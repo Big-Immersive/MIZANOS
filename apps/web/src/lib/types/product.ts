@@ -22,6 +22,8 @@ export interface Product {
   archived_at: string | null;
   tasks_locked: boolean;
   task_count: number;
+  bug_count: number;
+  bugs_fixed_count: number;
   created_at: string;
   updated_at: string;
 }

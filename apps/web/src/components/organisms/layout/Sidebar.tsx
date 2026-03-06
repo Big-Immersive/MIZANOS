@@ -85,7 +85,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                 <MizanLogo size={18} className="text-primary-foreground" />
               </div>
               <h1 className="text-base font-semibold text-foreground leading-tight">
-                Mizan AI
+                Mizan OS
               </h1>
             </Link>
             <Button

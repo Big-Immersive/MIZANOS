@@ -2,16 +2,14 @@
 
 import { BaseInput } from "@/components/atoms/inputs/BaseInput";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/atoms/inputs/BaseSelect";
+  SearchableSelect,
+  type SearchableSelectOption,
+} from "@/components/atoms/inputs/SearchableSelect";
 import { Button } from "@/components/molecules/buttons/Button";
 import { cn } from "@/lib/utils/cn";
 import type { ProfileSummary } from "@/lib/types";
 import { Search, Filter, X, User } from "lucide-react";
+import { useMemo } from "react";
 
 interface RoleFilterConfig {
   value: string;
@@ -37,6 +35,41 @@ interface ProductsFilterBarProps {
   onClearFilters: () => void;
 }
 
+const STATUS_OPTIONS: SearchableSelectOption[] = [
+  { value: "all", label: "All Status" },
+  { value: "healthy", label: "Healthy" },
+  { value: "warning", label: "Warning" },
+  { value: "critical", label: "Critical" },
+];
+
+const VERTICAL_OPTIONS: SearchableSelectOption[] = [
+  { value: "all", label: "All Verticals" },
+  { value: "business", label: "Business" },
+  { value: "marketing", label: "Marketing" },
+  { value: "development", label: "Development" },
+  { value: "product", label: "Product" },
+];
+
+function buildStageOptions(stages: string[]): SearchableSelectOption[] {
+  return [
+    { value: "all", label: "All Stages" },
+    ...stages.map((s) => ({ value: s, label: s })),
+  ];
+}
+
+function buildRoleOptions(
+  label: string,
+  profiles: ProfileSummary[],
+): SearchableSelectOption[] {
+  return [
+    { value: "all", label: `All ${label}s` },
+    ...profiles.map((p) => ({
+      value: p.id,
+      label: p.full_name ?? p.email ?? "Unknown",
+    })),
+  ];
+}
+
 export function ProductsFilterBar({
   searchQuery,
   onSearchChange,
@@ -53,6 +86,8 @@ export function ProductsFilterBar({
   hasActiveFilters,
   onClearFilters,
 }: ProductsFilterBarProps) {
+  const stageOptions = useMemo(() => buildStageOptions(stages), [stages]);
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="relative flex-1 min-w-[160px] max-w-sm">
@@ -86,77 +121,49 @@ export function ProductsFilterBar({
         </Button>
       )}
 
-      <Select value={statusFilter} onValueChange={onStatusChange}>
-        <SelectTrigger
-          className={cn(
-            "w-[130px] shrink-0 bg-card",
-            statusFilter !== "all" && "border-primary/30",
-          )}
-        >
-          <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="healthy">Healthy</SelectItem>
-          <SelectItem value="warning">Warning</SelectItem>
-          <SelectItem value="critical">Critical</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={pillarFilter} onValueChange={onPillarChange}>
-        <SelectTrigger
-          className={cn(
-            "w-[130px] shrink-0 bg-card",
-            pillarFilter !== "all" && "border-primary/30",
-          )}
-        >
-          <SelectValue placeholder="Vertical" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Verticals</SelectItem>
-          <SelectItem value="business">Business</SelectItem>
-          <SelectItem value="marketing">Marketing</SelectItem>
-          <SelectItem value="development">Development</SelectItem>
-          <SelectItem value="product">Product</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={stageFilter} onValueChange={onStageChange}>
-        <SelectTrigger
-          className={cn(
-            "w-[130px] shrink-0 bg-card",
-            stageFilter !== "all" && "border-primary/30",
-          )}
-        >
-          <SelectValue placeholder="Stage" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Stages</SelectItem>
-          {stages.map((stage) => (
-            <SelectItem key={stage} value={stage}>
-              {stage}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SearchableSelect
+        value={statusFilter}
+        onValueChange={onStatusChange}
+        options={STATUS_OPTIONS}
+        placeholder="Status"
+        icon={<Filter className="h-4 w-4 text-muted-foreground" />}
+        triggerClassName={cn(
+          "w-[130px] shrink-0 bg-card",
+          statusFilter !== "all" && "border-primary/30",
+        )}
+      />
+      <SearchableSelect
+        value={pillarFilter}
+        onValueChange={onPillarChange}
+        options={VERTICAL_OPTIONS}
+        placeholder="Vertical"
+        triggerClassName={cn(
+          "w-[130px] shrink-0 bg-card",
+          pillarFilter !== "all" && "border-primary/30",
+        )}
+      />
+      <SearchableSelect
+        value={stageFilter}
+        onValueChange={onStageChange}
+        options={stageOptions}
+        placeholder="Stage"
+        triggerClassName={cn(
+          "w-[130px] shrink-0 bg-card",
+          stageFilter !== "all" && "border-primary/30",
+        )}
+      />
       {roleFilters.map((rf) => (
-        <Select key={rf.label} value={rf.value} onValueChange={rf.onChange}>
-          <SelectTrigger
-            className={cn(
-              "w-[150px] shrink-0 bg-card",
-              rf.value !== "all" && "border-primary/30",
-            )}
-          >
-            <SelectValue placeholder={rf.label} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All {rf.label}s</SelectItem>
-            {rf.profiles.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.full_name ?? p.email ?? "Unknown"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          key={rf.label}
+          value={rf.value}
+          onValueChange={rf.onChange}
+          options={buildRoleOptions(rf.label, rf.profiles)}
+          placeholder={rf.label}
+          triggerClassName={cn(
+            "w-[150px] shrink-0 bg-card",
+            rf.value !== "all" && "border-primary/30",
+          )}
+        />
       ))}
       {hasActiveFilters && (
         <Button

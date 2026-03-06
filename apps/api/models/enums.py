@@ -47,6 +47,29 @@ REQUIRED_TEAM_COMPOSITION = {
 }
 
 
+class TaskType(str, enum.Enum):
+    TASK = "task"
+    BUG = "bug"
+    MARKETING_TASK = "marketing_task"
+
+
+class BugStatus(str, enum.Enum):
+    REPORTED = "reported"
+    TRIAGING = "triaging"
+    IN_PROGRESS = "in_progress"
+    FIXED = "fixed"
+    VERIFIED = "verified"
+    REOPENED = "reopened"
+    WONT_FIX = "wont_fix"
+    LIVE = "live"
+
+
+class MarketingTaskStatus(str, enum.Enum):
+    PLANNED = "planned"
+    IN_EXECUTION = "in_execution"
+    COMPLETED = "completed"
+
+
 class ProjectSourceType(str, enum.Enum):
     LOVABLE_PORT = "lovable_port"
     REPLIT_PORT = "replit_port"

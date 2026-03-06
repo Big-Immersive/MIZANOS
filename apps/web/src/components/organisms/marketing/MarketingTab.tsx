@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Globe, Share2, Key, CheckSquare } from "lucide-react";
+import { Globe, Share2, Key, CheckSquare, ListTodo } from "lucide-react";
 import type { MarketingDomain, MarketingSocialHandle, MarketingCredential, MarketingChecklistItem } from "@/lib/types/marketing";
 import {
   useMarketingDomains,
@@ -13,6 +13,7 @@ import { DomainsSection } from "./DomainsSection";
 import { SocialHandlesSection } from "./SocialHandlesSection";
 import { CredentialsSection } from "./CredentialsSection";
 import { ChecklistSection } from "./ChecklistSection";
+import { MarketingTasksSection } from "./MarketingTasksSection";
 
 interface MarketingTabProps {
   productId: string;
@@ -20,6 +21,7 @@ interface MarketingTabProps {
 }
 
 const TABS = [
+  { id: "tasks", label: "Tasks", icon: ListTodo },
   { id: "domains", label: "Domains", icon: Globe },
   { id: "social", label: "Social Handles", icon: Share2 },
   { id: "credentials", label: "Credentials", icon: Key },
@@ -29,7 +31,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export function MarketingTab({ productId, canViewCredentials = false }: MarketingTabProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("domains");
+  const [activeTab, setActiveTab] = useState<TabId>("tasks");
   const { data: domains, isLoading: domainsLoading } = useMarketingDomains(productId);
   const { data: socialHandles, isLoading: socialsLoading } = useMarketingSocialHandles(productId);
   const { data: credentials, isLoading: credentialsLoading } = useMarketingCredentials(productId);
@@ -70,6 +72,9 @@ export function MarketingTab({ productId, canViewCredentials = false }: Marketin
         <div className="text-center py-8 text-muted-foreground">Loading marketing assets...</div>
       ) : (
         <div className="min-h-[200px]">
+          {activeTab === "tasks" && (
+            <MarketingTasksSection productId={productId} />
+          )}
           {activeTab === "domains" && (
             <DomainsSection domains={domains ?? []} productId={productId} />
           )}

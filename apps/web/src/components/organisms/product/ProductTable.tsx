@@ -15,6 +15,7 @@ const COLUMNS = [
   { label: "Stage", className: "w-[90px]" },
   { label: "PM", className: "w-[120px]" },
   { label: "Tasks", className: "w-[50px] text-right" },
+  { label: "Bugs", className: "w-[60px] text-right" },
   { label: "Progress", className: "w-[100px]" },
   { label: "Health", className: "w-[50px] text-right" },
 ] as const;

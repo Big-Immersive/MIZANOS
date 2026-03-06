@@ -23,9 +23,15 @@ export type ProjectSourceType =
 
 export type PillarType = "business" | "marketing" | "development" | "product";
 
+export type TaskType = "task" | "bug" | "marketing_task";
+
 export type TaskStatus = "backlog" | "in_progress" | "review" | "done" | "live" | "cancelled";
 
-export type TaskPriority = "low" | "medium" | "high";
+export type BugStatus = "reported" | "triaging" | "in_progress" | "fixed" | "verified" | "reopened" | "wont_fix" | "live";
+
+export type MarketingTaskStatus = "planned" | "in_execution" | "completed";
+
+export type TaskPriority = "low" | "medium" | "high" | "critical" | "production_bug";
 
 export type ProductStatus = "active" | "on_hold" | "completed" | "archived";
 

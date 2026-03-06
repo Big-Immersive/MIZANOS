@@ -10,6 +10,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/settings": "Settings",
   "/projects": "Projects",
   "/tasks": "Tasks",
+  "/bugs": "Bugs",
 };
 
 export function capitalizeSegment(segment: string): string {

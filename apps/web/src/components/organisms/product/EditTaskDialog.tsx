@@ -24,7 +24,7 @@ const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   pillar: z.enum(["business", "marketing", "development", "product"]),
-  priority: z.enum(["low", "medium", "high"]),
+  priority: z.enum(["low", "medium", "high", "critical", "production_bug"]),
   status: z.enum(["backlog", "in_progress", "review", "done", "live", "cancelled"]),
   due_date: z.string().optional(),
   assignee_id: z.string().optional(),
