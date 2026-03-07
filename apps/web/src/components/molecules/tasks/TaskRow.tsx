@@ -14,9 +14,10 @@ interface TaskRowProps {
   onToggle: () => void;
   onClick: () => void;
   statusDisplay?: Record<string, TaskStatusConfig>;
+  hideCheckbox?: boolean;
 }
 
-export function TaskRow({ task, selected, assigneeName, onToggle, onClick, statusDisplay }: TaskRowProps) {
+export function TaskRow({ task, selected, assigneeName, onToggle, onClick, statusDisplay, hideCheckbox }: TaskRowProps) {
   const display = statusDisplay ?? TASK_STATUS_DISPLAY;
   const fallbackKey = statusDisplay ? Object.keys(display)[0] : "backlog";
   const statusConfig = display[task.status ?? fallbackKey] ?? display[fallbackKey];
@@ -28,9 +29,11 @@ export function TaskRow({ task, selected, assigneeName, onToggle, onClick, statu
       onClick={onClick}
     >
       <div className="flex items-center gap-3 p-3">
-        <div onClick={(e) => e.stopPropagation()}>
-          <BaseCheckbox checked={selected} onCheckedChange={onToggle} />
-        </div>
+        {!hideCheckbox && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <BaseCheckbox checked={selected} onCheckedChange={onToggle} />
+          </div>
+        )}
         <StatusIcon className={`h-5 w-5 shrink-0 ${statusConfig.color}`} />
 
         <div className="flex-1 min-w-0">

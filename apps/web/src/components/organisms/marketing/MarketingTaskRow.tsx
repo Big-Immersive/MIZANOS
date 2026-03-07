@@ -51,6 +51,7 @@ export function MarketingTaskRow({
             onToggle={onToggle}
             onClick={onClick}
             statusDisplay={MARKETING_TASK_STATUS_DISPLAY}
+            hideCheckbox
           />
           {subtaskCount > 0 && (
             <Badge variant="secondary" className="absolute top-3 right-28 text-[10px]">
@@ -71,6 +72,7 @@ export function MarketingTaskRow({
               onToggle={() => {}}
               onClick={onClick}
               statusDisplay={MARKETING_TASK_STATUS_DISPLAY}
+              hideCheckbox
             />
           ))}
           <button
