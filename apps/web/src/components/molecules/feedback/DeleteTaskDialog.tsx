@@ -20,6 +20,7 @@ interface DeleteTaskDialogProps {
   taskStatus: string;
   onConfirm: () => void;
   isPending?: boolean;
+  subtaskCount?: number;
 }
 
 export function DeleteTaskDialog({
@@ -29,6 +30,7 @@ export function DeleteTaskDialog({
   taskStatus,
   onConfirm,
   isPending = false,
+  subtaskCount = 0,
 }: DeleteTaskDialogProps) {
   const isSafe = SAFE_STATUSES.has(taskStatus);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -48,6 +50,12 @@ export function DeleteTaskDialog({
               : `"${taskTitle}" is currently ${taskStatus.replace("_", " ")}. Deleting an active task will permanently remove all associated data.`}
           </DialogDescription>
         </DialogHeader>
+
+        {subtaskCount > 0 && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+            This task has {subtaskCount} subtask{subtaskCount !== 1 ? "s" : ""} that will also be permanently deleted.
+          </p>
+        )}
 
         {!isSafe && (
           <label className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm cursor-pointer">

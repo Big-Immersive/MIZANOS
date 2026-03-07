@@ -270,6 +270,7 @@ export function TaskDetailDrawer({
             onOpenChange={setDeleteDialogOpen}
             taskTitle={task.title}
             taskStatus={task.status}
+            subtaskCount={task.subtaskCount}
             isPending={deleteTask.isPending}
             onConfirm={() => {
               deleteTask.mutate(task.id, {
