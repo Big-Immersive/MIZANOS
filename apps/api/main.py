@@ -47,6 +47,7 @@ from apps.api.routers import (
     scans,
 )
 from apps.api.routers import jobs
+from apps.api.routers import reports
 from apps.api.routers import (
     external_documents,
     document_folders,
@@ -155,6 +156,7 @@ app.include_router(specification_sources.router, prefix="/products", tags=["spec
 app.include_router(utilities.router, prefix="/utilities", tags=["utilities"])
 app.include_router(scans.router, prefix="/scans", tags=["scans"])
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+app.include_router(reports.router, prefix="/reports", tags=["reports"])
 
 
 # Mount static files for uploaded avatars

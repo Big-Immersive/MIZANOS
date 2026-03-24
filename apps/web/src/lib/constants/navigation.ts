@@ -3,6 +3,7 @@ import {
   FileInput,
   FolderKanban,
   ClipboardCheck,
+  BarChart3,
   Bug,
   Users,
   Network,
@@ -38,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "MANAGE",
     items: [
       { href: "/tasks", icon: ClipboardCheck, label: "Tasks" },
+      { href: "/reports", icon: BarChart3, label: "Reports" },
       { href: "/bugs", icon: Bug, label: "Bugs" },
       { href: "/team", icon: Users, label: "Team" },
       { href: "/org-chart", icon: Network, label: "Organization Chart" },
