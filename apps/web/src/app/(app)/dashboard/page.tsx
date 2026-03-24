@@ -10,6 +10,7 @@ import { ProductionHealth } from "@/components/organisms/dashboard/ProductionHea
 import { StageChart } from "@/components/organisms/dashboard/StageChart";
 import { RecentActivity } from "@/components/organisms/dashboard/RecentActivity";
 import { ProductsSection } from "@/components/organisms/dashboard/ProductsSection";
+import { ReportsSummaryCard } from "@/components/organisms/dashboard/ReportsSummaryCard";
 import { useProducts } from "@/hooks/queries/useProducts";
 import { useMyDashboard } from "@/hooks/utils/useMyDashboard";
 
@@ -85,6 +86,10 @@ export default function DashboardPage() {
           <StageChart data={stageDistribution} />
           <RecentActivity filterProductIds={myProductIds} />
         </div>
+      </div>
+
+      <div className="animate-fade-in" style={{ animationDelay: "250ms" }}>
+        <ReportsSummaryCard />
       </div>
 
       <ProductsSection filterProductIds={myProductIds} />

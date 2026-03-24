@@ -28,3 +28,4 @@ export { GitHubPatsRepository, githubPatsRepository } from "./github-pats.reposi
 export { JobsRepository, jobsRepository } from "./jobs.repository";
 export { TaskCommentsRepository, taskCommentsRepository } from "./task-comments.repository";
 export { ScansRepository, scansRepository } from "./scans.repository";
+export { ReportsRepository, reportsRepository } from "./reports.repository";

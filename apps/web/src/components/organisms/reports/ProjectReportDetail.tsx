@@ -1,0 +1,132 @@
+"use client";
+
+import { format } from "date-fns";
+import { Calendar, GitBranch, User, Loader2 } from "lucide-react";
+import { Card, CardContent } from "@/components/atoms/display/Card";
+import { Badge } from "@/components/atoms/display/Badge";
+import { useProjectReport } from "@/hooks/queries/useReports";
+import { TaskStatusChart } from "@/components/molecules/reports/TaskStatusChart";
+import { AIAnalysisCard } from "@/components/molecules/reports/AIAnalysisCard";
+
+interface Props {
+  productId: string;
+}
+
+export function ProjectReportDetail({ productId }: Props) {
+  const { data, isLoading } = useProjectReport(productId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const gm = data.github_metrics;
+
+  return (
+    <div className="space-y-4">
+      {/* Header card */}
+      <Card className="animate-fade-in">
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <h2 className="text-xl font-semibold">{data.product_name}</h2>
+            {data.stage && (
+              <Badge variant="secondary" className="text-xs">
+                {data.stage}
+              </Badge>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
+            {data.pm_name && (
+              <span className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5" /> PM: {data.pm_name}
+              </span>
+            )}
+            {data.dev_name && (
+              <span className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5" /> Dev: {data.dev_name}
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              Created {format(new Date(data.created_at), "dd MMM yyyy")}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Metrics grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="animate-fade-in" style={{ animationDelay: "50ms" }}>
+          <TaskStatusChart metrics={data.task_metrics} />
+        </div>
+
+        <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <h3 className="text-sm font-semibold">Features</h3>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-pillar-product transition-all"
+                    style={{ width: `${data.feature_metrics.completion_pct}%` }}
+                  />
+                </div>
+                <span className="font-mono text-sm tabular-nums">
+                  {data.feature_metrics.completion_pct}%
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {Object.entries(data.feature_metrics.by_status).map(([s, c]) => (
+                  <div key={s} className="bg-secondary/50 rounded-lg py-2">
+                    <p className="font-mono font-bold text-sm">{c}</p>
+                    <p className="text-[10px] text-muted-foreground capitalize">{s}</p>
+                  </div>
+                ))}
+              </div>
+
+              {gm && (
+                <>
+                  <h3 className="text-sm font-semibold pt-2 flex items-center gap-1.5">
+                    <GitBranch className="h-3.5 w-3.5" /> GitHub
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <MiniStat label="Scans" value={gm.total_scans} />
+                    <MiniStat label="Added" value={`+${gm.total_lines_added}`} color="text-status-healthy" />
+                    <MiniStat label="Removed" value={`-${gm.total_lines_removed}`} color="text-status-critical" />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* AI Analysis */}
+      <div className="animate-fade-in" style={{ animationDelay: "150ms" }}>
+        <AIAnalysisCard productId={productId} analysis={data.ai_analysis} />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color?: string;
+}) {
+  return (
+    <div className="bg-secondary/50 rounded-lg py-2">
+      <p className={`font-mono font-bold text-sm ${color ?? ""}`}>{value}</p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
