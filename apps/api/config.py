@@ -31,11 +31,11 @@ class Settings(BaseSettings):
     firecrawl_api_key: str = ""
 
     # Storage (S3-compatible — Railway Bucket / MinIO / AWS)
-    s3_bucket: str = ""
-    s3_region: str = "auto"
-    s3_access_key: str = ""
-    s3_secret_key: str = ""
-    s3_endpoint: str = ""
+    aws_s3_bucket_name: str = ""
+    aws_default_region: str = "auto"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_endpoint_url: str = ""
 
     # Storage (GCS)
     gcs_bucket_name: str = ""

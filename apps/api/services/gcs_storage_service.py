@@ -14,20 +14,20 @@ _LOCAL_UPLOAD_DIR = Path("uploads")
 
 def _get_s3_client():
     """Lazily initialise S3-compatible client. Returns ``None`` when not configured."""
-    if not settings.s3_bucket or not settings.s3_access_key:
+    if not settings.aws_s3_bucket_name or not settings.aws_access_key_id:
         return None
     try:
         import boto3
         from botocore.config import Config
 
         client_kwargs = {
-            "aws_access_key_id": settings.s3_access_key,
-            "aws_secret_access_key": settings.s3_secret_key,
-            "region_name": settings.s3_region,
+            "aws_access_key_id": settings.aws_access_key_id,
+            "aws_secret_access_key": settings.aws_secret_access_key,
+            "region_name": settings.aws_default_region,
             "config": Config(signature_version="s3v4"),
         }
-        if settings.s3_endpoint:
-            client_kwargs["endpoint_url"] = settings.s3_endpoint
+        if settings.aws_endpoint_url:
+            client_kwargs["endpoint_url"] = settings.aws_endpoint_url
         return boto3.client("s3", **client_kwargs)
     except Exception:
         logger.warning("S3 client init failed – trying GCS fallback", exc_info=True)
@@ -63,7 +63,7 @@ class GCSStorageService:
 
     @property
     def is_s3_available(self) -> bool:
-        return self._s3 is not None and bool(settings.s3_bucket)
+        return self._s3 is not None and bool(settings.aws_s3_bucket_name)
 
     @property
     def is_gcs_available(self) -> bool:
@@ -84,14 +84,14 @@ class GCSStorageService:
 
     def _upload_to_s3(self, content: bytes, path: str, content_type: str) -> str:
         self._s3.put_object(
-            Bucket=settings.s3_bucket,
+            Bucket=settings.aws_s3_bucket_name,
             Key=path,
             Body=content,
             ContentType=content_type,
         )
-        if settings.s3_endpoint:
-            return f"{settings.s3_endpoint}/{settings.s3_bucket}/{path}"
-        return f"https://{settings.s3_bucket}.s3.{settings.s3_region}.amazonaws.com/{path}"
+        if settings.aws_endpoint_url:
+            return f"{settings.aws_endpoint_url}/{settings.aws_s3_bucket_name}/{path}"
+        return f"https://{settings.aws_s3_bucket_name}.s3.{settings.aws_default_region}.amazonaws.com/{path}"
 
     def _upload_to_gcs(self, content: bytes, path: str, content_type: str) -> str:
         bucket = self._gcs.bucket(settings.gcs_bucket_name)
@@ -110,7 +110,7 @@ class GCSStorageService:
         if self.is_s3_available:
             return self._s3.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": settings.s3_bucket, "Key": file_path},
+                Params={"Bucket": settings.aws_s3_bucket_name, "Key": file_path},
                 ExpiresIn=expiration_minutes * 60,
             )
         if self.is_gcs_available:
