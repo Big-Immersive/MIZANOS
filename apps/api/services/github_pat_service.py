@@ -59,6 +59,14 @@ class GitHubPatService(BaseService[GitHubPat]):
         if not verification["valid"]:
             raise bad_request("Invalid GitHub token")
 
+        scopes = verification.get("scopes") or ""
+        if "repo" not in scopes:
+            raise bad_request(
+                "Token is missing the 'repo' scope. "
+                "Create a new token with 'repo' access at "
+                "https://github.com/settings/tokens"
+            )
+
         token_hash = self._hash_token(data.token)
         await self._check_duplicate(token_hash, profile_id)
 

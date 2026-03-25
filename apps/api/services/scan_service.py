@@ -30,8 +30,6 @@ class ScanService:
             raise not_found("Product")
         if not product.repository_url:
             raise bad_request("Product has no linked repository")
-        if not product.github_pat_id:
-            raise bad_request("Product has no linked GitHub PAT")
 
         await self._check_no_running_scan(product_id)
 
