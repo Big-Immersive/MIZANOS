@@ -83,7 +83,7 @@ export function ProjectReportsList() {
                 <Th align="right">Tasks Done</Th>
                 <Th align="right">In Progress</Th>
                 <Th align="right">Commits</Th>
-                <Th align="right">Recent</Th>
+                <Th align="right">Recent Commit</Th>
                 <Th>Created</Th>
               </tr>
             </thead>
@@ -157,11 +157,18 @@ function ProjectRow({ project: p, index }: { project: ProjectReportBrief; index:
           {p.total_commits}
         </span>
       </td>
-      <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-        {p.recent_commits > 0 ? (
-          <span className="text-status-healthy">{p.recent_commits}</span>
+      <td className="px-4 py-2.5 text-right">
+        {p.last_scan_at ? (
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-mono tabular-nums text-status-healthy">
+              {p.recent_commits}
+            </span>
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+              {format(new Date(p.last_scan_at), "dd MMM, hh:mm a")}
+            </span>
+          </div>
         ) : (
-          <span className="text-muted-foreground">0</span>
+          <span className="text-muted-foreground font-mono tabular-nums">0</span>
         )}
       </td>
       <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
