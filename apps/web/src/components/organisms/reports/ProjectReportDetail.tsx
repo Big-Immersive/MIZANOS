@@ -68,7 +68,7 @@ export function ProjectReportDetail({ productId }: Props) {
       {/* Metrics grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="animate-fade-in" style={{ animationDelay: "50ms" }}>
-          <TaskStatusChart metrics={data.task_metrics} />
+          <TaskStatusChart metrics={data.task_metrics} productId={productId} />
         </div>
 
         <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>

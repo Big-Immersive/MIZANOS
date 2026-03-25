@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
 import { Skeleton } from "@/components/atoms/display/Skeleton";
@@ -19,8 +20,11 @@ import type { Task, KanbanTask } from "@/lib/types";
 import { ClipboardCheck, ListTodo } from "lucide-react";
 
 export default function TasksPage() {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [projectFilter, setProjectFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState(
+    searchParams.get("project") || "all",
+  );
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [pmFilter, setPmFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");

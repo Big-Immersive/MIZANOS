@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import type { TaskMetrics } from "@/lib/types";
 
@@ -37,9 +38,10 @@ function statusLabel(status: string): string {
 
 interface Props {
   metrics: TaskMetrics;
+  productId: string;
 }
 
-export function TaskStatusChart({ metrics }: Props) {
+export function TaskStatusChart({ metrics, productId }: Props) {
   const entries = Object.entries(metrics.by_status).sort(
     ([, a], [, b]) => b - a,
   );
@@ -49,7 +51,12 @@ export function TaskStatusChart({ metrics }: Props) {
     <Card>
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Tasks</h3>
+          <Link
+            href={`/tasks?project=${productId}`}
+            className="text-sm font-semibold hover:text-primary hover:underline transition-colors"
+          >
+            Tasks
+          </Link>
           <span className="font-mono text-sm tabular-nums text-muted-foreground">
             {metrics.completion_pct}% complete
           </span>
