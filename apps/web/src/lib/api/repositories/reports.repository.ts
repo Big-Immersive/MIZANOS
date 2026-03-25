@@ -34,6 +34,15 @@ export class ReportsRepository {
     );
     return response.data;
   }
+
+  async generateDocument(productIds: string[]): Promise<Blob> {
+    const response = await this.client.post(
+      `${this.basePath}/generate-document`,
+      { product_ids: productIds },
+      { responseType: "blob" },
+    );
+    return response.data;
+  }
 }
 
 export const reportsRepository = new ReportsRepository();

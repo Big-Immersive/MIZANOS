@@ -3,6 +3,8 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from apps.api.dependencies import CurrentUser, DbSession
 from apps.api.schemas.reports import (
@@ -11,7 +13,12 @@ from apps.api.schemas.reports import (
     ReportsSummaryResponse,
 )
 from apps.api.services.report_ai_service import ReportAIService
+from apps.api.services.report_document_service import ReportDocumentService
 from apps.api.services.report_service import ReportService
+
+
+class GenerateDocumentRequest(BaseModel):
+    product_ids: list[UUID]
 
 router = APIRouter()
 
@@ -56,3 +63,19 @@ async def trigger_ai_analysis(
 ):
     """Generate AI analysis for a project report."""
     return await service.generate_analysis(product_id)
+
+
+@router.post("/generate-document")
+async def generate_document(
+    body: GenerateDocumentRequest,
+    user: CurrentUser,
+    db: DbSession,
+):
+    """Generate a downloadable .docx report for selected projects."""
+    svc = ReportDocumentService(db)
+    buf = await svc.generate(body.product_ids)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename=Project_Status_Update.docx"},
+    )
