@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { format } from "date-fns";
 import { Calendar, GitBranch, User, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/atoms/display/Card";
@@ -33,7 +34,12 @@ export function ProjectReportDetail({ productId }: Props) {
       <Card className="animate-fade-in">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-4">
-            <h2 className="text-xl font-semibold">{data.product_name}</h2>
+            <Link
+              href={`/products/${productId}`}
+              className="text-xl font-semibold hover:text-primary hover:underline transition-colors"
+            >
+              {data.product_name}
+            </Link>
             {data.stage && (
               <Badge variant="secondary" className="text-xs">
                 {data.stage}
