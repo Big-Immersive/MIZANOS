@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileDown, Loader2, CheckCircle2 } from "lucide-react";
+import { FileDown, FileText, Loader2, CheckCircle2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,8 @@ import { Badge } from "@/components/atoms/display/Badge";
 import { reportsRepository } from "@/lib/api/repositories";
 import { toast } from "sonner";
 import type { ProjectReportBrief } from "@/lib/types";
+
+type Format = "pdf" | "docx";
 
 interface Props {
   open: boolean;
@@ -44,18 +46,24 @@ export function GenerateReportDialog({ open, onOpenChange, projects }: Props) {
     }
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (format: Format) => {
     if (selected.size === 0) {
       toast.error("Select at least one project");
       return;
     }
     setGenerating(true);
     try {
-      const blob = await reportsRepository.generateDocument(Array.from(selected));
+      const ids = Array.from(selected);
+      const blob =
+        format === "pdf"
+          ? await reportsRepository.generatePDF(ids)
+          : await reportsRepository.generateDocument(ids);
+
+      const ext = format === "pdf" ? "pdf" : "docx";
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Project_Status_Update_${new Date().toISOString().split("T")[0]}.docx`;
+      a.download = `Project_Status_Update_${new Date().toISOString().split("T")[0]}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -124,13 +132,28 @@ export function GenerateReportDialog({ open, onOpenChange, projects }: Props) {
           <BaseButton variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </BaseButton>
-          <BaseButton onClick={handleGenerate} disabled={generating || selected.size === 0}>
+          <BaseButton
+            variant="outline"
+            onClick={() => handleGenerate("docx")}
+            disabled={generating || selected.size === 0}
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
+            .docx
+          </BaseButton>
+          <BaseButton
+            onClick={() => handleGenerate("pdf")}
+            disabled={generating || selected.size === 0}
+          >
             {generating ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
               <FileDown className="h-4 w-4 mr-2" />
             )}
-            {generating ? "Generating..." : "Download .docx"}
+            .pdf
           </BaseButton>
         </div>
       </DialogContent>

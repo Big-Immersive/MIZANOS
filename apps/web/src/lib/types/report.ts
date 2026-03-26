@@ -46,6 +46,8 @@ export interface ProjectReportBrief {
   total_commits: number;
   recent_commits: number;
   last_scan_at: string | null;
+  live_url: string | null;
+  dashboard_url: string | null;
 }
 
 export interface ReportsSummary {

@@ -14,6 +14,7 @@ from apps.api.schemas.reports import (
 )
 from apps.api.services.report_ai_service import ReportAIService
 from apps.api.services.report_document_service import ReportDocumentService
+from apps.api.services.report_pdf_service import ReportPDFService
 from apps.api.services.report_service import ReportService
 
 
@@ -78,4 +79,20 @@ async def generate_document(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": "attachment; filename=Project_Status_Update.docx"},
+    )
+
+
+@router.post("/generate-pdf")
+async def generate_pdf(
+    body: GenerateDocumentRequest,
+    user: CurrentUser,
+    db: DbSession,
+):
+    """Generate a downloadable PDF report for selected projects."""
+    svc = ReportPDFService(db)
+    buf = await svc.generate(body.product_ids)
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=Project_Status_Update.pdf"},
     )

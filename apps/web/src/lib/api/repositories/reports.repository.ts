@@ -43,6 +43,15 @@ export class ReportsRepository {
     );
     return response.data;
   }
+
+  async generatePDF(productIds: string[]): Promise<Blob> {
+    const response = await this.client.post(
+      `${this.basePath}/generate-pdf`,
+      { product_ids: productIds },
+      { responseType: "blob" },
+    );
+    return response.data;
+  }
 }
 
 export const reportsRepository = new ReportsRepository();

@@ -64,6 +64,8 @@ class ProjectReportBrief(BaseSchema):
     total_commits: int = 0
     recent_commits: int = 0
     last_scan_at: datetime | None = None
+    live_url: str | None = None
+    dashboard_url: str | None = None
 
 
 class ReportsSummaryResponse(BaseSchema):

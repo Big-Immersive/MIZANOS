@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.models.audit import RepoScanHistory, RepositoryAnalysis
-from apps.api.models.product import Product, ProductMember
+from apps.api.models.product import Product, ProductEnvironment, ProductMember
 from apps.api.models.task import Task
 from packages.common.utils.error_handlers import not_found
 
@@ -35,9 +35,11 @@ class ReportService:
         task_counts = await self._fetch_task_counts(product_ids)
         commit_counts = await self._fetch_commit_counts(product_ids)
         recent_commit_counts = await self._fetch_recent_commit_counts(product_ids)
+        env_urls = await self._fetch_environment_urls(product_ids)
 
         briefs = self._build_briefs(
-            products, members_map, task_counts, commit_counts, recent_commit_counts,
+            products, members_map, task_counts, commit_counts,
+            recent_commit_counts, env_urls,
         )
 
         total_tasks = sum(b["total_tasks"] for b in briefs)
@@ -63,8 +65,10 @@ class ReportService:
         commit_counts = await self._fetch_commit_counts([product_id])
 
         recent_commit_counts = await self._fetch_recent_commit_counts([product_id])
+        env_urls = await self._fetch_environment_urls([product_id])
         briefs = self._build_briefs(
-            [product], members_map, task_counts, commit_counts, recent_commit_counts,
+            [product], members_map, task_counts, commit_counts,
+            recent_commit_counts, env_urls,
         )
         base = briefs[0] if briefs else {}
 
@@ -161,12 +165,36 @@ class ReportService:
         result = await self.session.execute(stmt)
         return {pid: count for pid, count in result.all()}
 
+    async def _fetch_environment_urls(self, product_ids: list[UUID]) -> dict:
+        """Return {product_id: {live_url, dashboard_url}}."""
+        stmt = (
+            select(ProductEnvironment)
+            .where(
+                ProductEnvironment.product_id.in_(product_ids),
+                ProductEnvironment.url.isnot(None),
+            )
+        )
+        result = await self.session.execute(stmt)
+        rows = result.scalars().all()
+
+        urls: dict[UUID, dict[str, str | None]] = {}
+        for env in rows:
+            entry = urls.setdefault(env.product_id, {"live_url": None, "dashboard_url": None})
+            env_type = (env.environment_type or "").lower()
+            if env_type == "production":
+                entry["live_url"] = env.url
+            elif env_type in ("development", "staging"):
+                if not entry["dashboard_url"]:
+                    entry["dashboard_url"] = env.url
+        return urls
+
     # ------------------------------------------------------------------
     # Private: builders
     # ------------------------------------------------------------------
 
     def _build_briefs(
-        self, products, members_map, task_counts, commit_counts, recent_commit_counts,
+        self, products, members_map, task_counts, commit_counts,
+        recent_commit_counts, env_urls,
     ) -> list[dict]:
         briefs = []
         for p in products:
@@ -176,6 +204,7 @@ class ReportService:
             in_progress = sum(tc.get(s, 0) for s in IN_PROGRESS_STATUSES)
             cc = commit_counts.get(p.id, {})
             m = members_map.get(p.id, {})
+            urls = env_urls.get(p.id, {})
 
             briefs.append({
                 "product_id": p.id, "product_name": p.name,
@@ -188,6 +217,8 @@ class ReportService:
                 "total_commits": cc.get("total", 0),
                 "recent_commits": recent_commit_counts.get(p.id, 0),
                 "last_scan_at": cc.get("last_scan_at"),
+                "live_url": urls.get("live_url"),
+                "dashboard_url": urls.get("dashboard_url"),
             })
         return briefs
 

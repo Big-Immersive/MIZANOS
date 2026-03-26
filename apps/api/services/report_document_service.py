@@ -7,14 +7,39 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.services.llm_config import get_llm_config
 from apps.api.services.report_service import ReportService
 
 logger = logging.getLogger(__name__)
+
+
+def _add_hyperlink(paragraph, url: str, text: str) -> None:
+    """Add a clickable hyperlink to a paragraph."""
+    part = paragraph.part
+    r_id = part.relate_to(url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+    new_run = OxmlElement("w:r")
+    r_pr = OxmlElement("w:rPr")
+    c = OxmlElement("w:color")
+    c.set(qn("w:val"), "0563C1")
+    r_pr.append(c)
+    u = OxmlElement("w:u")
+    u.set(qn("w:val"), "single")
+    r_pr.append(u)
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), "18")
+    r_pr.append(sz)
+    new_run.append(r_pr)
+    new_run.text = text
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
 
 
 class ReportDocumentService:
@@ -101,8 +126,9 @@ class ReportDocumentService:
             name = proj["product_name"]
             stage = proj.get("stage") or "N/A"
             pm = proj.get("pm_name") or "—"
+            dev = proj.get("dev_name") or "—"
 
-            # Project header: "Name  STATUS  PM: Name"
+            # Project header: "Name  STATUS  PM: Name  Dev: Name"
             ph = doc.add_paragraph()
             run = ph.add_run(f"{name}  ")
             run.bold = True
@@ -113,7 +139,11 @@ class ReportDocumentService:
             run.font.size = Pt(10)
             run.font.color.rgb = RGBColor(0, 128, 0)
 
-            run = ph.add_run(f"PM: {pm}")
+            run = ph.add_run(f"PM: {pm}  ")
+            run.font.size = Pt(10)
+            run.font.color.rgb = RGBColor(100, 100, 100)
+
+            run = ph.add_run(f"Dev: {dev}")
             run.font.size = Pt(10)
             run.font.color.rgb = RGBColor(100, 100, 100)
 
@@ -124,6 +154,25 @@ class ReportDocumentService:
                 run = bp.add_run(bullet)
                 run.font.size = Pt(10)
 
+            # Explore links
+            live_url = proj.get("live_url")
+            dash_url = proj.get("dashboard_url")
+            if live_url or dash_url:
+                lp = doc.add_paragraph()
+                run = lp.add_run("EXPLORE THIS PRODUCT:")
+                run.bold = True
+                run.font.size = Pt(9)
+                if live_url:
+                    link_p = doc.add_paragraph()
+                    run = link_p.add_run("  Live: ")
+                    run.font.size = Pt(9)
+                    _add_hyperlink(link_p, live_url, live_url)
+                if dash_url:
+                    link_p = doc.add_paragraph()
+                    run = link_p.add_run("  Dashboard: ")
+                    run.font.size = Pt(9)
+                    _add_hyperlink(link_p, dash_url, dash_url)
+
             doc.add_paragraph()
 
     @staticmethod
@@ -133,7 +182,13 @@ class ReportDocumentService:
         run.bold = True
         run.font.size = Pt(14)
 
-        headers = ["Project", "Status", "PM", "Dev", "Tasks", "Commits", "Created"]
+        sub = doc.add_paragraph()
+        run = sub.add_run("Quick reference for all projects — status, live links, and dashboard/dev links.")
+        run.font.size = Pt(10)
+        run.italic = True
+        run.font.color.rgb = RGBColor(100, 100, 100)
+
+        headers = ["Project", "Status", "PM", "Dev", "Tasks", "Live Link", "Dashboard / Dev"]
         table = doc.add_table(rows=1, cols=len(headers))
         table.style = "Light Grid Accent 1"
 
@@ -152,12 +207,22 @@ class ReportDocumentService:
             cells[2].text = proj.get("pm_name") or "—"
             cells[3].text = proj.get("dev_name") or "—"
             cells[4].text = f"{proj['completed_tasks']}/{proj['total_tasks']}"
-            cells[5].text = str(proj.get("total_commits", 0))
-            created = proj.get("created_at")
-            if created:
-                if isinstance(created, str):
-                    created = datetime.fromisoformat(created)
-                cells[6].text = created.strftime("%d %b %Y")
+
+            # Live link cell with hyperlink
+            live_url = proj.get("live_url")
+            if live_url:
+                cells[5].text = ""
+                p = cells[5].paragraphs[0]
+                _add_hyperlink(p, live_url, _shorten_url(live_url))
+            else:
+                cells[5].text = "—"
+
+            # Dashboard / dev link with hyperlink
+            dash_url = proj.get("dashboard_url")
+            if dash_url:
+                cells[6].text = ""
+                p = cells[6].paragraphs[0]
+                _add_hyperlink(p, dash_url, _shorten_url(dash_url))
             else:
                 cells[6].text = "—"
 
@@ -234,3 +299,8 @@ class ReportDocumentService:
             max_tokens=2048,
         )
         return response.choices[0].message.content or ""
+
+
+def _shorten_url(url: str) -> str:
+    """Remove protocol prefix for display."""
+    return url.replace("https://", "").replace("http://", "").rstrip("/")
