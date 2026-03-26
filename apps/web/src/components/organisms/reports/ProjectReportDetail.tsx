@@ -35,7 +35,7 @@ export function ProjectReportDetail({ productId }: Props) {
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-4">
             <Link
-              href={`/products/${productId}`}
+              href={`/projects/${productId}`}
               className="text-xl font-semibold hover:text-primary hover:underline transition-colors"
             >
               {data.product_name}
