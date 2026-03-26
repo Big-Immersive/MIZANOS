@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
@@ -17,9 +17,17 @@ import { useProfiles } from "@/hooks/queries/useProfiles";
 import { TASK_STATUS_DISPLAY, TASK_PRIORITY_COLORS, TASK_STATUSES } from "@/lib/constants";
 import { isMyDashboardEnabled } from "@/hooks/utils/useMyDashboard";
 import type { Task, KanbanTask } from "@/lib/types";
-import { ClipboardCheck, ListTodo } from "lucide-react";
+import { ClipboardCheck, ListTodo, Loader2 } from "lucide-react";
 
 export default function TasksPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+      <TasksPageContent />
+    </Suspense>
+  );
+}
+
+function TasksPageContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState(
