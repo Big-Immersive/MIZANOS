@@ -71,7 +71,7 @@ class ReportPDFService:
         pdf.set_text_color(0, 0, 0)
         pdf.cell(0, 12, "PROJECT STATUS UPDATE", new_x="LMARGIN", new_y="NEXT")
 
-        date_str = datetime.now(timezone.utc).strftime("Daily Briefing \u2014 %d %B %Y")
+        date_str = datetime.now(timezone.utc).strftime("Daily Briefing -- %d %B %Y")
         pdf.set_font("Helvetica", "", 11)
         pdf.set_text_color(100, 100, 100)
         pdf.cell(0, 8, date_str, new_x="LMARGIN", new_y="NEXT")
@@ -88,7 +88,7 @@ class ReportPDFService:
 
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(0, 0, 0)
-        pdf.multi_cell(0, 5, text)
+        pdf.multi_cell(0, 5, _safe(text))
         pdf.ln(6)
 
     @staticmethod
@@ -104,8 +104,8 @@ class ReportPDFService:
             pid = str(proj["product_id"])
             name = proj["product_name"]
             stage = (proj.get("stage") or "N/A").upper()
-            pm = proj.get("pm_name") or "\u2014"
-            dev = proj.get("dev_name") or "\u2014"
+            pm = proj.get("pm_name") or "--"
+            dev = proj.get("dev_name") or "--"
 
             # Check if we need a page break for the project block
             if pdf.get_y() > pdf.h - 50:
@@ -115,7 +115,7 @@ class ReportPDFService:
             pdf.set_font("Helvetica", "B", 12)
             pdf.set_text_color(0, 0, 0)
             x_start = pdf.get_x()
-            pdf.cell(pdf.get_string_width(name) + 2, 7, name)
+            pdf.cell(pdf.get_string_width(_safe(name)) + 2, 7, _safe(name))
 
             # Stage badge
             pdf.set_font("Helvetica", "B", 9)
@@ -125,7 +125,7 @@ class ReportPDFService:
             # PM and Dev
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(100, 100, 100)
-            pdf.cell(0, 7, f"  PM: {pm}  Dev: {dev}", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 7, f"  PM: {_safe(pm)}  Dev: {_safe(dev)}", new_x="LMARGIN", new_y="NEXT")
 
             # Bullet points
             bullets = updates.get(pid, [])
@@ -133,8 +133,8 @@ class ReportPDFService:
             pdf.set_text_color(0, 0, 0)
             for bullet in bullets:
                 pdf.set_x(pdf.l_margin + 6)
-                pdf.cell(4, 5, "\u2022")
-                pdf.multi_cell(0, 5, f"  {bullet}")
+                pdf.cell(4, 5, "-")
+                pdf.multi_cell(0, 5, f"  {_safe(bullet)}")
 
             # Explore links
             live_url = proj.get("live_url")
@@ -173,7 +173,7 @@ class ReportPDFService:
         pdf.set_text_color(100, 100, 100)
         pdf.cell(
             0, 6,
-            "Quick reference for all projects \u2014 status, live links, and dashboard/dev links.",
+            "Quick reference for all projects -- status, live links, and dashboard/dev links.",
             new_x="LMARGIN", new_y="NEXT",
         )
         pdf.ln(3)
@@ -208,9 +208,9 @@ class ReportPDFService:
                 pdf.set_font("Helvetica", "", 8)
 
             pdf.set_text_color(0, 0, 0)
-            pdf.cell(col_w[0], row_h, proj["product_name"][:18], border=1, fill=fill)
-            pdf.cell(col_w[1], row_h, (proj.get("stage") or "\u2014")[:12], border=1, fill=fill)
-            pdf.cell(col_w[2], row_h, (proj.get("dev_name") or "\u2014")[:16], border=1, fill=fill)
+            pdf.cell(col_w[0], row_h, _safe(proj["product_name"][:18]), border=1, fill=fill)
+            pdf.cell(col_w[1], row_h, _safe((proj.get("stage") or "--")[:12]), border=1, fill=fill)
+            pdf.cell(col_w[2], row_h, _safe((proj.get("dev_name") or "--")[:16]), border=1, fill=fill)
             pdf.cell(col_w[3], row_h, f"{proj['completed_tasks']}/{proj['total_tasks']}", border=1, fill=fill)
 
             # Live link
@@ -221,7 +221,7 @@ class ReportPDFService:
                 pdf.set_text_color(5, 99, 193)
                 pdf.cell(col_w[4], row_h, _shorten(live_url)[:26], border=1, fill=fill, link=live_url)
             else:
-                pdf.cell(col_w[4], row_h, "\u2014", border=1, fill=fill)
+                pdf.cell(col_w[4], row_h, "--", border=1, fill=fill)
 
             # Dashboard link
             dash_url = proj.get("dashboard_url")
@@ -230,7 +230,7 @@ class ReportPDFService:
                 pdf.cell(col_w[5], row_h, _shorten(dash_url)[:26], border=1, fill=fill, link=dash_url)
             else:
                 pdf.set_text_color(0, 0, 0)
-                pdf.cell(col_w[5], row_h, "\u2014", border=1, fill=fill)
+                pdf.cell(col_w[5], row_h, "--", border=1, fill=fill)
 
             pdf.ln(row_h)
 
@@ -304,6 +304,21 @@ class ReportPDFService:
 def _shorten(url: str) -> str:
     """Remove protocol prefix for display."""
     return url.replace("https://", "").replace("http://", "").rstrip("/")
+
+
+def _safe(text: str) -> str:
+    """Replace Unicode chars unsupported by Helvetica with ASCII equivalents."""
+    return (
+        text.replace("\u2014", "--")
+        .replace("\u2013", "-")
+        .replace("\u2018", "'")
+        .replace("\u2019", "'")
+        .replace("\u201c", '"')
+        .replace("\u201d", '"')
+        .replace("\u2022", "-")
+        .replace("\u2026", "...")
+        .replace("\u00a0", " ")
+    )
 
 
 def _stage_color(pdf: _ReportPDF, stage: str) -> None:
