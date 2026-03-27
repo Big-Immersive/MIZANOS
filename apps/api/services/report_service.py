@@ -330,7 +330,6 @@ class ReportService:
                 "url": c.get("html_url", ""),
             })
         return commits
-            return []
 
     async def _fetch_task_details_for_ai(self, product_id: UUID) -> list[dict]:
         """Fetch individual task details for AI analysis prompt."""
