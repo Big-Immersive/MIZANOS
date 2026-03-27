@@ -260,6 +260,54 @@ class ReportService:
         m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", url)
         return (m.group(1), m.group(2)) if m else None
 
+    async def get_recent_commits(self, product_id: UUID) -> list[dict]:
+        """Fetch recent commit details from GitHub for a product."""
+        from apps.api.config import settings
+
+        stmt = select(Product.repository_url, Product.tracked_branch, Product.github_pat_id).where(Product.id == product_id)
+        result = await self.session.execute(stmt)
+        row = result.one_or_none()
+        if not row or not row.repository_url:
+            return []
+
+        owner_repo = self._parse_owner_repo(row.repository_url)
+        if not owner_repo:
+            return []
+        owner, repo = owner_repo
+
+        token = settings.github_api_token or None
+        if not token:
+            token = await self._resolve_pat_token(row.github_pat_id) if row.github_pat_id else None
+        if not token:
+            return []
+
+        headers = {"Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}"}
+        params = {"per_page": "10", "sha": row.tracked_branch or "main"}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/commits",
+                    headers=headers, params=params, timeout=15,
+                )
+                if resp.status_code != 200:
+                    return []
+                commits = []
+                for c in resp.json()[:10]:
+                    commit_data = c.get("commit", {})
+                    author = commit_data.get("author", {})
+                    commits.append({
+                        "sha": (c.get("sha") or "")[:7],
+                        "message": (commit_data.get("message") or "").split("\n")[0],
+                        "author": author.get("name", ""),
+                        "date": author.get("date", ""),
+                        "url": c.get("html_url", ""),
+                    })
+                return commits
+        except Exception:
+            logger.warning("Failed to fetch recent commits for product %s", product_id)
+            return []
+
     async def _fetch_task_details_for_ai(self, product_id: UUID) -> list[dict]:
         """Fetch individual task details for AI analysis prompt."""
         from apps.api.models.user import Profile

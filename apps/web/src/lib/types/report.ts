@@ -30,6 +30,14 @@ export interface AIAnalysis {
   generated_at: string;
 }
 
+export interface RecentCommit {
+  sha: string;
+  message: string;
+  author: string;
+  date: string;
+  url: string;
+}
+
 export interface ProjectReportBrief {
   product_id: string;
   product_name: string;

@@ -59,6 +59,16 @@ async def get_project_report(
     return report
 
 
+@router.get("/projects/{product_id}/recent-commits")
+async def get_recent_commits(
+    product_id: UUID,
+    user: CurrentUser,
+    service: ReportService = Depends(_report_service),
+):
+    """Fetch recent commit details from GitHub."""
+    return await service.get_recent_commits(product_id)
+
+
 @router.post("/projects/{product_id}/analyze", response_model=AIAnalysisResponse)
 async def trigger_ai_analysis(
     product_id: UUID,

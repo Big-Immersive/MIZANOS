@@ -2,14 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
-import { GitCommit, Search } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { GitCommit, Search, ExternalLink, Loader2, X } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/atoms/display/Card";
 import { BaseInput } from "@/components/atoms/inputs/BaseInput";
 import { Badge } from "@/components/atoms/display/Badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/atoms/layout/Popover";
 import { useReportsSummary } from "@/hooks/queries/useReports";
-import { Loader2 } from "lucide-react";
-import type { ProjectReportBrief } from "@/lib/types";
+import { reportsRepository } from "@/lib/api/repositories";
+import type { ProjectReportBrief, RecentCommit } from "@/lib/types";
 
 const STAGE_COLORS: Record<string, string> = {
   Intake: "bg-pillar-business/15 text-pillar-business",
@@ -120,6 +121,67 @@ function Th({
   );
 }
 
+function RecentCommitCell({ productId, recentCommits }: { productId: string; recentCommits: number }) {
+  const [commits, setCommits] = useState<RecentCommit[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const handleOpen = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen && commits === null) {
+      setLoading(true);
+      reportsRepository.getRecentCommits(productId).then(setCommits).catch(() => setCommits([])).finally(() => setLoading(false));
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <button className="flex flex-col items-end gap-0.5 cursor-pointer hover:opacity-70 transition-opacity">
+          <span className="font-mono tabular-nums text-status-healthy">
+            {recentCommits}
+          </span>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+            {format(new Date(), "dd MMM yyyy")}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 p-0" align="end">
+        <div className="p-3 border-b flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Recent Commits</p>
+            <p className="text-xs text-muted-foreground">{recentCommits > 0 ? `${recentCommits} today` : "Latest commits on this branch"}</p>
+          </div>
+          <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-accent"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+          ) : !commits?.length ? (
+            <p className="text-xs text-muted-foreground text-center py-6">No commits found</p>
+          ) : (
+            <div className="divide-y">
+              {commits.map((c) => (
+                <div key={c.sha} className="px-3 py-2 hover:bg-accent/30">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium leading-snug flex-1">{c.message}</p>
+                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[10px] font-mono text-primary hover:underline flex items-center gap-1">
+                      {c.sha}<ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {c.author}{c.date ? ` - ${formatDistanceToNow(new Date(c.date), { addSuffix: true })}` : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ProjectRow({ project: p, index }: { project: ProjectReportBrief; index: number }) {
   return (
     <tr
@@ -136,11 +198,11 @@ function ProjectRow({ project: p, index }: { project: ProjectReportBrief; index:
       </td>
       <td className="px-4 py-2.5">
         <Badge variant="secondary" className={`text-[10px] ${stageBadgeClass(p.stage)}`}>
-          {p.stage || "—"}
+          {p.stage || "-"}
         </Badge>
       </td>
-      <td className="px-4 py-2.5 text-muted-foreground">{p.pm_name || "—"}</td>
-      <td className="px-4 py-2.5 text-muted-foreground">{p.dev_name || "—"}</td>
+      <td className="px-4 py-2.5 text-muted-foreground">{p.pm_name || "-"}</td>
+      <td className="px-4 py-2.5 text-muted-foreground">{p.dev_name || "-"}</td>
       <td className="px-4 py-2.5 text-right font-mono tabular-nums">
         {p.completed_tasks}/{p.total_tasks}
       </td>
@@ -154,14 +216,7 @@ function ProjectRow({ project: p, index }: { project: ProjectReportBrief; index:
         </span>
       </td>
       <td className="px-4 py-2.5 text-right">
-        <div className="flex flex-col items-end gap-0.5">
-          <span className="font-mono tabular-nums text-status-healthy">
-            {p.recent_commits}
-          </span>
-          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-            {format(new Date(), "dd MMM yyyy")}
-          </span>
-        </div>
+        <RecentCommitCell productId={p.product_id} recentCommits={p.recent_commits} />
       </td>
       <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
         {format(new Date(p.created_at), "dd MMM yyyy")}

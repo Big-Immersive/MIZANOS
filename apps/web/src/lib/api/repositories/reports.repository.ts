@@ -1,5 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type {
+  RecentCommit,
   ReportsSummary,
   ProjectReportDetail,
   AIAnalysis,
@@ -25,6 +26,14 @@ export class ReportsRepository {
   async getProjectReport(productId: string): Promise<ProjectReportDetail> {
     const response = await this.client.get<ProjectReportDetail>(
       `${this.basePath}/projects/${productId}`,
+    );
+    return response.data;
+  }
+
+  async getRecentCommits(productId: string): Promise<RecentCommit[]> {
+    const response = await this.client.get<RecentCommit[]>(
+      `${this.basePath}/projects/${productId}/recent-commits`,
+      { timeout: 30_000 },
     );
     return response.data;
   }
