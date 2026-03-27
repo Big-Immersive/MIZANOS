@@ -76,12 +76,12 @@ class ReportPDFService:
         logo_path = os.path.join(os.path.dirname(__file__), "mizan_logo.png")
         y = pdf.get_y()
         if os.path.exists(logo_path):
-            pdf.image(logo_path, x=pdf.w - pdf.r_margin - 22, y=y, w=5)
-        pdf.set_font("Helvetica", "B", 8)
+            pdf.image(logo_path, x=pdf.w - pdf.r_margin - 28, y=y, w=8)
+        pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(80, 80, 80)
-        pdf.set_xy(pdf.w - pdf.r_margin - 16, y + 0.5)
-        pdf.cell(16, 4, "Mizan OS", align="L")
-        pdf.set_xy(pdf.l_margin, y + 6)
+        pdf.set_xy(pdf.w - pdf.r_margin - 19, y + 1)
+        pdf.cell(19, 5, "Mizan OS", align="L")
+        pdf.set_xy(pdf.l_margin, y + 10)
 
         pdf.set_font("Helvetica", "B", 20)
         pdf.set_text_color(0, 0, 0)
