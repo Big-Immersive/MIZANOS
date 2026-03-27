@@ -548,9 +548,10 @@ class ReportService:
             return None
 
     async def get_tasks_for_report(self, product_ids: list[UUID]) -> dict[UUID, dict]:
-        """Return per-project task summary + non-done task list + links for reports."""
+        """Return per-project task summary + non-done task list + links + code progress for reports."""
         task_counts = await self._fetch_task_counts(product_ids)
         links_map = await self._fetch_project_links(product_ids)
+        code_progress = await self._fetch_code_progress_batch(product_ids)
         result: dict[UUID, dict] = {}
 
         for pid in product_ids:
@@ -559,8 +560,9 @@ class ReportService:
             done = sum(tc.get(s, 0) for s in COMPLETED_STATUSES)
             in_progress = sum(tc.get(s, 0) for s in IN_PROGRESS_STATUSES)
             backlog = total - done - in_progress
+            cp = code_progress.get(pid, 0.0)
 
-            summary = f"Tasks: {total} total | {done} Done | {in_progress} In Progress | {backlog} Backlog"
+            summary = f"Tasks: {total} total | {done} Done | {in_progress} In Progress | {backlog} Backlog | Code Progress: {cp}%"
 
             all_tasks = await self._fetch_task_details_for_ai(pid)
             non_done = [
@@ -572,9 +574,32 @@ class ReportService:
                 "summary_line": summary,
                 "non_done_tasks": non_done,
                 "links": links_map.get(pid, []),
+                "code_progress": cp,
             }
 
         return result
+
+    async def _fetch_code_progress_batch(self, product_ids: list[UUID]) -> dict[UUID, float]:
+        """Return {product_id: progress_pct} from latest RepositoryAnalysis."""
+        from sqlalchemy import distinct
+        result_map: dict[UUID, float] = {}
+        for pid in product_ids:
+            stmt = (
+                select(RepositoryAnalysis.gap_analysis)
+                .where(
+                    RepositoryAnalysis.product_id == pid,
+                    RepositoryAnalysis.gap_analysis.isnot(None),
+                )
+                .order_by(RepositoryAnalysis.created_at.desc())
+                .limit(1)
+            )
+            result = await self.session.execute(stmt)
+            gap = result.scalar_one_or_none()
+            if gap and isinstance(gap, dict):
+                result_map[pid] = gap.get("progress_pct", 0.0)
+            else:
+                result_map[pid] = 0.0
+        return result_map
 
     async def _fetch_project_links(self, product_ids: list[UUID]) -> dict[UUID, list[dict]]:
         """Return {product_id: [{name, url}, ...]} from product_links table."""

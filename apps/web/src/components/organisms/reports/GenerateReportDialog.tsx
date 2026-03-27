@@ -133,7 +133,6 @@ export function GenerateReportDialog({ open, onOpenChange, projects }: Props) {
             Cancel
           </BaseButton>
           <BaseButton
-            variant="outline"
             onClick={() => handleGenerate("docx")}
             disabled={generatingFormat !== null || selected.size === 0}
           >
