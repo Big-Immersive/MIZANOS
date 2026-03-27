@@ -9,6 +9,7 @@ ROUTE_PATTERNS: list[dict] = [
         "file_glob": "*.py",
         "regex": r'@(?:router|app)\.(get|post|put|patch|delete)\(\s*["\']([^"\']+)',
         "group_map": {"method": 1, "path": 2},
+        "handler_lookahead": r"(?:async\s+)?def\s+(\w+)",
     },
     {
         "name": "flask",
@@ -16,6 +17,7 @@ ROUTE_PATTERNS: list[dict] = [
         "regex": r'@(?:app|blueprint|bp)\.route\(\s*["\']([^"\']+)["\']'
                  r'(?:.*methods\s*=\s*\[([^\]]+)\])?',
         "group_map": {"path": 1, "method": 2},
+        "handler_lookahead": r"(?:async\s+)?def\s+(\w+)",
     },
     {
         "name": "django",
@@ -29,6 +31,7 @@ ROUTE_PATTERNS: list[dict] = [
         "file_glob": "*.{ts,js}",
         "regex": r'(?:app|router)\.(get|post|put|patch|delete)\(\s*["\']([^"\']+)',
         "group_map": {"method": 1, "path": 2},
+        "handler_lookahead": r"(?:async\s+)?(?:function\s+)?(\w+)",
     },
     # --- Ruby ---
     {

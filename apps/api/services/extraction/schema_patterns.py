@@ -1,6 +1,6 @@
 """Schema and validation extraction patterns."""
 
-# Each entry: name, file_glob, class_regex, field_regex (optional).
+# Each entry: name, file_glob, class_regex, field_regex, field_type_regex (optional).
 SCHEMA_PATTERNS: list[dict] = [
     # --- Python ---
     {
@@ -8,12 +8,14 @@ SCHEMA_PATTERNS: list[dict] = [
         "file_glob": "*.py",
         "class_regex": r"^class\s+(\w+)\(.*(?:BaseModel|BaseSchema).*\):",
         "field_regex": r"^\s+(\w+):\s+",
+        "field_type_regex": r"^\s+(\w+):\s+(\S+)",
     },
     {
         "name": "marshmallow",
         "file_glob": "*.py",
         "class_regex": r"^class\s+(\w+)\(.*(?:Schema|ma\.Schema).*\):",
         "field_regex": r"^\s+(\w+)\s*=\s*(?:fields|ma)\.\w+",
+        "field_type_regex": r"^\s+(\w+)\s*=\s*(?:fields|ma)\.(\w+)",
     },
     # --- JavaScript / TypeScript ---
     {
@@ -21,6 +23,7 @@ SCHEMA_PATTERNS: list[dict] = [
         "file_glob": "*.{ts,js}",
         "class_regex": r"(?:export\s+)?(?:const|let)\s+(\w+)\s*=\s*z\.(?:object|string|number|array|enum)",
         "field_regex": r"(\w+)\s*:\s*z\.",
+        "field_type_regex": r"(\w+)\s*:\s*z\.(\w+)",
     },
     # --- GraphQL ---
     {
@@ -28,6 +31,7 @@ SCHEMA_PATTERNS: list[dict] = [
         "file_glob": "*.graphql",
         "class_regex": r"^type\s+(\w+)\s*\{",
         "field_regex": r"^\s+(\w+)\s*[:(]",
+        "field_type_regex": r"^\s+(\w+)\s*:\s*(\w+)",
     },
     # --- Solidity ---
     {
@@ -35,5 +39,6 @@ SCHEMA_PATTERNS: list[dict] = [
         "file_glob": "*.sol",
         "class_regex": r"^struct\s+(\w+)\s*\{",
         "field_regex": r"^\s+\w+\s+(\w+)\s*;",
+        "field_type_regex": r"^\s+(\w+)\s+(\w+)\s*;",
     },
 ]

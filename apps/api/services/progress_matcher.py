@@ -1,5 +1,6 @@
 """Progress matcher — uses LLM to match tasks against extracted code artifacts."""
 
+import asyncio
 import json
 import logging
 
@@ -17,14 +18,19 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_RESULT = {
     "scan_summary": {
-        "total_tasks": 0,
-        "verified": 0,
-        "partial": 0,
-        "no_evidence": 0,
-        "progress_pct": 0.0,
+        "total_tasks": 0, "verified": 0, "partial": 0,
+        "no_evidence": 0, "progress_pct": 0.0,
     },
     "task_evidence": [],
 }
+
+_CATEGORY_LIMITS = {
+    "file_tree": 300, "routes": 150, "models": 100,
+    "schemas": 100, "components": 150, "functions": 150,
+    "pages": 100, "migrations": 50, "configs": 20,
+}
+
+BATCH_SIZE = 18
 
 
 class ProgressMatcherService:
@@ -39,16 +45,48 @@ class ProgressMatcherService:
             return _DEFAULT_RESULT
 
         llm_cfg = await get_llm_config(self.session)
+        trimmed = self._budget_artifacts(artifacts)
 
+        if len(tasks) <= BATCH_SIZE:
+            return await self._match_batch(tasks, trimmed, llm_cfg)
+
+        # Batch for large task lists
+        batches = [tasks[i:i + BATCH_SIZE] for i in range(0, len(tasks), BATCH_SIZE)]
+        all_evidence: list[dict] = []
+
+        for batch in batches:
+            result = await self._match_batch(batch, trimmed, llm_cfg)
+            all_evidence.extend(result.get("task_evidence", []))
+
+        summary = _compute_summary(all_evidence, len(tasks))
+        return {"scan_summary": summary, "task_evidence": all_evidence}
+
+    async def _match_batch(self, tasks: list[dict], artifacts: dict, llm_cfg) -> dict:
+        """Match a single batch of tasks against artifacts."""
         tasks_json = json.dumps(tasks, indent=2, default=str)
-        artifacts_json = json.dumps(self._trim_artifacts(artifacts), indent=2)
+        truncation_note = self._truncation_note(artifacts)
 
-        system_msg = HIGH_LEVEL_SYSTEM_PROMPT + TASK_EVIDENCE_SCHEMA
         user_msg = HIGH_LEVEL_USER_TEMPLATE.format(
-            tasks_json=tasks_json, artifacts_json=artifacts_json,
+            task_count=len(tasks),
+            file_count=len(artifacts.get("file_tree", [])),
+            route_count=len(artifacts.get("routes", [])),
+            model_count=len(artifacts.get("models", [])),
+            schema_count=len(artifacts.get("schemas", [])),
+            component_count=len(artifacts.get("components", [])),
+            function_count=len(artifacts.get("functions", [])),
+            truncation_note=truncation_note,
+            tasks_json=tasks_json,
+            routes_json=json.dumps(artifacts.get("routes", []), indent=1),
+            models_json=json.dumps(artifacts.get("models", []), indent=1),
+            schemas_json=json.dumps(artifacts.get("schemas", []), indent=1),
+            components_json=json.dumps(artifacts.get("components", []), indent=1),
+            functions_json=json.dumps(artifacts.get("functions", []), indent=1),
+            file_tree_json=json.dumps(artifacts.get("file_tree", []), indent=1),
         )
 
+        system_msg = HIGH_LEVEL_SYSTEM_PROMPT + TASK_EVIDENCE_SCHEMA
         client = AsyncOpenAI(api_key=llm_cfg.api_key, base_url=llm_cfg.base_url)
+
         response = await client.chat.completions.create(
             model=llm_cfg.model,
             messages=[
@@ -63,16 +101,32 @@ class ProgressMatcherService:
         return self._parse_response(raw, len(tasks))
 
     @staticmethod
-    def _trim_artifacts(artifacts: dict) -> dict:
-        """Limit artifact lists to avoid exceeding token limits."""
+    def _budget_artifacts(artifacts: dict) -> dict:
+        """Limit artifact lists per category to stay within token budget."""
         trimmed = {}
-        max_items = 200
         for key, value in artifacts.items():
-            if isinstance(value, list) and len(value) > max_items:
-                trimmed[key] = value[:max_items]
+            if isinstance(value, list):
+                limit = _CATEGORY_LIMITS.get(key, 100)
+                if len(value) > limit:
+                    trimmed[key] = value[:limit]
+                else:
+                    trimmed[key] = value
             else:
                 trimmed[key] = value
         return trimmed
+
+    @staticmethod
+    def _truncation_note(artifacts: dict) -> str:
+        """Generate a note about truncated categories."""
+        notes = []
+        for key, value in artifacts.items():
+            if isinstance(value, list):
+                limit = _CATEGORY_LIMITS.get(key, 100)
+                if len(value) >= limit:
+                    notes.append(f"- {key}: showing {limit} of {len(value)}+ items")
+        if notes:
+            return "NOTE: Some artifact lists were truncated:\n" + "\n".join(notes)
+        return ""
 
     @staticmethod
     def _parse_response(raw: str, total_tasks: int) -> dict:
@@ -87,14 +141,11 @@ class ProgressMatcherService:
         try:
             result = json.loads(cleaned)
         except json.JSONDecodeError:
-            logger.warning("Failed to parse LLM response as JSON")
+            logger.warning("Failed to parse LLM scan response as JSON")
             return {
                 "scan_summary": {
-                    "total_tasks": total_tasks,
-                    "verified": 0,
-                    "partial": 0,
-                    "no_evidence": total_tasks,
-                    "progress_pct": 0.0,
+                    "total_tasks": total_tasks, "verified": 0,
+                    "partial": 0, "no_evidence": total_tasks, "progress_pct": 0.0,
                 },
                 "task_evidence": [],
                 "raw_response": raw[:500],
@@ -112,10 +163,10 @@ def _compute_summary(evidence: list[dict], total: int) -> dict:
     verified = sum(1 for e in evidence if e.get("verified"))
     partial = sum(
         1 for e in evidence
-        if not e.get("verified") and e.get("confidence", 0) >= 0.3
+        if not e.get("verified") and e.get("confidence", 0) >= 0.25
     )
     no_evidence = total - verified - partial
-    pct = (verified / total * 100) if total > 0 else 0.0
+    pct = ((verified + partial * 0.5) / total * 100) if total > 0 else 0.0
     return {
         "total_tasks": total,
         "verified": verified,

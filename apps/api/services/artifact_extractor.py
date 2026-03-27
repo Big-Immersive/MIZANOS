@@ -44,6 +44,7 @@ class ArtifactExtractor:
             "schemas": run_class_patterns(root, SCHEMA_PATTERNS),
             "components": self._extract_components(root),
             "pages": self._extract_pages(root),
+            "functions": self._extract_functions(root),
             "dependencies": parse_all_dependencies(root),
             "migrations": self._extract_migrations(root),
             "configs": self._extract_configs(root),
@@ -126,6 +127,31 @@ class ArtifactExtractor:
                     if rel not in seen:
                         seen.add(rel)
                         results.append({"name": f.stem, "file": rel})
+        return results
+
+    def _extract_functions(self, root: Path) -> list[dict]:
+        """Extract top-level function signatures from code files."""
+        import re
+        results: list[dict] = []
+        func_re = re.compile(
+            r"^(?:export\s+)?(?:async\s+)?(?:def|function)\s+(\w+)\s*\(([^)]{0,200})\)",
+            re.MULTILINE,
+        )
+        for f in sorted(root.rglob("*")):
+            if should_skip(f) or not f.is_file() or f.suffix not in _CODE_EXTS:
+                continue
+            try:
+                text = f.read_text(errors="replace")
+            except OSError:
+                continue
+            for m in func_re.finditer(text):
+                name = m.group(1)
+                if name.startswith("_") or name in ("__init__", "setUp", "tearDown"):
+                    continue
+                sig = m.group(0).strip()[:200]
+                results.append({"name": name, "file": str(f.relative_to(root)), "signature": sig})
+                if len(results) >= 300:
+                    return results
         return results
 
     def _extract_configs(self, root: Path) -> list[dict]:

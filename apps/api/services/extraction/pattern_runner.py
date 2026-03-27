@@ -18,11 +18,7 @@ def should_skip(path: Path) -> bool:
 
 
 def expand_globs(glob_str: str) -> list[str]:
-    """Expand brace syntax into multiple globs.
-
-    '*.{ts,js}' -> ['*.ts', '*.js']
-    '*.py'      -> ['*.py']
-    """
+    """Expand brace syntax into multiple globs."""
     match = re.match(r"^(.*)\{([^}]+)\}(.*)$", glob_str)
     if not match:
         return [glob_str]
@@ -59,17 +55,55 @@ def find_block_end(text: str, start: int) -> int:
     return len(text)
 
 
-def run_regex_patterns(root: Path, patterns: list[dict]) -> list[dict]:
-    """Run regex-based patterns against matching files.
+def extract_docstring(block: str) -> str:
+    """Extract first docstring or comment from a code block (max 200 chars)."""
+    # Python triple-quote docstring
+    m = re.search(r'"""(.*?)"""', block, re.DOTALL)
+    if m:
+        return m.group(1).strip()[:200]
+    m = re.search(r"'''(.*?)'''", block, re.DOTALL)
+    if m:
+        return m.group(1).strip()[:200]
+    # JS/TS /** */ comment
+    m = re.search(r"/\*\*(.*?)\*/", block, re.DOTALL)
+    if m:
+        return re.sub(r"\s*\*\s*", " ", m.group(1)).strip()[:200]
+    # Single-line comments at start
+    lines = block.strip().split("\n")[:3]
+    comments = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("#") or stripped.startswith("//"):
+            comments.append(stripped.lstrip("#/ "))
+        else:
+            break
+    return " ".join(comments)[:200] if comments else ""
 
-    Each pattern dict must have:
-      - file_glob: str (e.g. '*.py', '*.{ts,js}')
-      - regex: str (compiled per run)
-      - group_map: dict[str, int] mapping output keys to capture groups
-    """
+
+def extract_method_names(block: str) -> list[str]:
+    """Extract method/function names defined in a block (max 10)."""
+    methods = re.findall(r"(?:async\s+)?(?:def|function)\s+(\w+)", block)
+    return methods[:10]
+
+
+def extract_field_with_types(block: str, field_re, type_re=None) -> list[str]:
+    """Extract fields with type annotations if available."""
+    if type_re:
+        compiled = re.compile(type_re, re.MULTILINE)
+        matches = compiled.findall(block)
+        return [f"{name}: {typ}" for name, typ in matches][:20]
+    if field_re:
+        compiled = re.compile(field_re, re.MULTILINE) if isinstance(field_re, str) else field_re
+        return [m.group(1) for m in compiled.finditer(block)][:20]
+    return []
+
+
+def run_regex_patterns(root: Path, patterns: list[dict]) -> list[dict]:
+    """Run regex-based patterns against matching files."""
     results: list[dict] = []
     for pat in patterns:
         compiled = re.compile(pat["regex"], re.MULTILINE)
+        handler_re = re.compile(pat["handler_lookahead"], re.MULTILINE) if pat.get("handler_lookahead") else None
         for f in iter_files(root, pat["file_glob"]):
             text = safe_read(f)
             if text is None:
@@ -81,19 +115,18 @@ def run_regex_patterns(root: Path, patterns: list[dict]) -> list[dict]:
                         entry[key] = match.group(group_idx)
                     except IndexError:
                         pass
+                # Look ahead for handler name
+                if handler_re:
+                    after = text[match.end():match.end() + 300]
+                    hm = handler_re.search(after)
+                    if hm:
+                        entry["handler"] = hm.group(1)
                 results.append(entry)
     return results
 
 
 def run_class_patterns(root: Path, patterns: list[dict]) -> list[dict]:
-    """Run class+field regex patterns for models/schemas.
-
-    Each pattern dict must have:
-      - file_glob: str
-      - class_regex: str
-      - field_regex: str | None
-    Returns list of {name, fields, file}.
-    """
+    """Run class+field regex patterns for models/schemas with enriched data."""
     results: list[dict] = []
     for pat in patterns:
         class_re = re.compile(pat["class_regex"], re.MULTILINE)
@@ -102,20 +135,30 @@ def run_class_patterns(root: Path, patterns: list[dict]) -> list[dict]:
             if pat.get("field_regex")
             else None
         )
+        type_re = pat.get("field_type_regex")
         for f in iter_files(root, pat["file_glob"]):
             text = safe_read(f)
             if text is None:
                 continue
             for match in class_re.finditer(text):
                 name = match.group(1)
+                block_end = find_block_end(text, match.end())
+                block = text[match.end():block_end]
+
                 fields: list[str] = []
                 if field_re:
-                    block_end = find_block_end(text, match.end())
-                    block = text[match.end():block_end]
                     fields = [m.group(1) for m in field_re.finditer(block)][:20]
+
+                field_types = extract_field_with_types(block, field_re, type_re)
+                docstring = extract_docstring(block)
+                methods = extract_method_names(block)
+
                 results.append({
                     "name": name,
                     "fields": fields,
+                    "field_types": field_types,
+                    "docstring": docstring,
+                    "methods": methods,
                     "file": str(f.relative_to(root)),
                 })
     return results

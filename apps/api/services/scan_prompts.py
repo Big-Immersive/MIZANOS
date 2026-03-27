@@ -1,27 +1,36 @@
 """Prompt templates for repository progress scanning."""
 
 HIGH_LEVEL_SYSTEM_PROMPT = """\
-You are a code progress analyzer for a project management tool called Mizan.
+You are a code progress analyzer for Mizan, a project management tool.
 
-Given a list of PM tasks and extracted code artifacts from a repository, \
-determine which tasks have verifiable evidence of implementation in the codebase.
+Given PM tasks and extracted code artifacts from a repository, determine which \
+tasks have evidence of implementation in the codebase.
 
 For each task, assess:
-- verified: true if there is clear evidence this task is implemented, false otherwise
-- confidence: 0.0-1.0 indicating how confident you are in the assessment
-- artifacts_found: list of specific files, routes, models, or components that serve as evidence
-- summary: one-line explanation of your reasoning
+- verified: true if there is reasonable evidence this task is implemented
+- confidence: 0.0-1.0 indicating how confident you are
+- artifacts_found: list of specific files, routes, models, or functions that serve as evidence
+- summary: one-line explanation
 
-Rules:
-1. If a task has a "verification_criteria" field, use it as the PRIMARY indicator \
-of what to look for in the codebase.
-2. Otherwise, infer what code artifacts would exist if the task were completed, \
-based on the task title and description.
-3. A task about "Create X API" should map to route definitions, service files, etc.
-4. A task about "Add Y page" should map to page/component files.
-5. A task about "Database model for Z" should map to model definitions.
-6. Be conservative — only mark verified=true if there is strong evidence.
-7. Partial evidence (e.g., model exists but no route) should get a lower confidence.
+Matching Rules:
+1. Use SEMANTIC matching — match by intent, not exact names. \
+A task "User authentication" matches files with auth, login, jwt, session, etc.
+2. If a task has "verification_criteria", use it as the PRIMARY indicator.
+3. Otherwise, infer what code would exist if the task were completed.
+4. A task "Create X API" matches route definitions, service files, handler functions.
+5. A task "Add Y page" matches page files, component files, UI components.
+6. A task "Database model for Z" matches model definitions with relevant fields.
+7. Use field_types and docstrings when available for better matching.
+8. Use function signatures and handler names to identify implementation.
+9. Mark verified=true if you find reasonable evidence (matching routes, models, \
+components, or functions). You don't need every single artifact — finding 2-3 \
+relevant ones is sufficient.
+10. If some artifacts exist but coverage is incomplete (model exists but no route), \
+set verified=false but confidence=0.4-0.6 and mark as PARTIAL.
+11. If a task status in PM is "done" or "completed" and you find ANY related \
+artifact (even a single matching file), give it confidence >= 0.5.
+12. File tree paths are a valid signal — if a task mentions "notifications" and \
+you see files like notification_service.py, notifications.tsx, etc., that counts.
 
 Return ONLY valid JSON matching this exact schema — no markdown fences, no explanation:
 """
@@ -50,17 +59,39 @@ TASK_EVIDENCE_SCHEMA = """\
 """
 
 HIGH_LEVEL_USER_TEMPLATE = """\
+## Project Summary
+- {task_count} tasks to analyze
+- {file_count} code files in repository
+- {route_count} API routes found
+- {model_count} database models found
+- {schema_count} validation schemas found
+- {component_count} UI components found
+- {function_count} functions found
+{truncation_note}
+
 ## Tasks from Project Management
 
-```json
 {tasks_json}
-```
 
-## Extracted Code Artifacts
+## Code Artifacts
 
-```json
-{artifacts_json}
-```
+### Routes (API endpoints)
+{routes_json}
 
-Analyze each task and return the JSON result.
+### Models (database)
+{models_json}
+
+### Schemas (validation)
+{schemas_json}
+
+### Components (UI)
+{components_json}
+
+### Functions (business logic)
+{functions_json}
+
+### File Tree (all code files)
+{file_tree_json}
+
+Analyze each task and return the JSON result. Use semantic matching.
 """
