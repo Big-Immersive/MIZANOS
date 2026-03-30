@@ -16,7 +16,7 @@ import { useProfiles } from "@/hooks/queries/useProfiles";
 import { useProductRoleFilters } from "@/hooks/utils/useProductRoleFilters";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 import { isMyDashboardEnabled, buildMyProjectIds } from "@/hooks/utils/useMyDashboard";
-import { PRODUCT_STAGES } from "@/lib/constants";
+import { PRODUCT_STAGES, type ProductStage } from "@/lib/constants";
 import { cn } from "@/lib/utils/cn";
 import {
   FolderKanban,
@@ -193,15 +193,57 @@ export default function ProductsPage() {
       )}
 
       {!isLoading && filteredProducts.length > 0 && viewMode === "grid" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              taskCount={product.task_count ?? 0}
-              pmName={pmNameMap.get(product.id)}
-            />
-          ))}
+        <div className="space-y-6">
+          {stages
+            .filter((stage) => filteredProducts.some((p) => (p.stage || "Intake") === stage))
+            .map((stage) => (
+              <div key={stage}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge variant="outline" className="text-xs font-medium px-2.5 py-0.5">
+                    {stage}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {filteredProducts.filter((p) => (p.stage || "Intake") === stage).length}
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredProducts
+                    .filter((p) => (p.stage || "Intake") === stage)
+                    .map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        taskCount={product.task_count ?? 0}
+                        pmName={pmNameMap.get(product.id)}
+                      />
+                    ))}
+                </div>
+              </div>
+            ))}
+          {/* Projects with unrecognized stages */}
+          {filteredProducts.some((p) => !stages.includes((p.stage || "Intake") as ProductStage)) && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="outline" className="text-xs font-medium px-2.5 py-0.5">
+                  Other
+                </Badge>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredProducts
+                  .filter((p) => !stages.includes((p.stage || "Intake") as ProductStage))
+                  .map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      taskCount={product.task_count ?? 0}
+                      pmName={pmNameMap.get(product.id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -73,7 +73,8 @@ export function StageProgress({ currentStage, productId, suggestedStage, canChan
         )}
 
         {PRODUCT_STAGES.map((stage, i) => {
-          const isComplete = stageIndex >= 0 && i < stageIndex;
+          const isOnHold = currentStage === "On Hold";
+          const isComplete = !isOnHold && stageIndex >= 0 && i < stageIndex;
           const isCurrent = stage === currentStage;
           return (
             <div
