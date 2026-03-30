@@ -4,9 +4,11 @@ import { Suspense, useState, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
+import { BaseButton } from "@/components/atoms/buttons/BaseButton";
 import { Skeleton } from "@/components/atoms/display/Skeleton";
 import { PageHeader } from "@/components/molecules/layout/PageHeader";
 import { TasksFilterBar } from "@/components/organisms/tasks/TasksFilterBar";
+import { GlobalAddTaskDialog } from "@/components/organisms/tasks/GlobalAddTaskDialog";
 import { TaskDetailDrawer } from "@/components/organisms/product/TaskDetailDrawer";
 import { toKanbanTask } from "@/components/organisms/kanban/kanban-utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,7 +19,7 @@ import { useProfiles } from "@/hooks/queries/useProfiles";
 import { TASK_STATUS_DISPLAY, TASK_PRIORITY_COLORS, TASK_STATUSES } from "@/lib/constants";
 import { isMyDashboardEnabled } from "@/hooks/utils/useMyDashboard";
 import type { Task, KanbanTask } from "@/lib/types";
-import { ClipboardCheck, ListTodo, Loader2 } from "lucide-react";
+import { ClipboardCheck, ListTodo, Loader2, Plus } from "lucide-react";
 
 export default function TasksPage() {
   return (
@@ -40,6 +42,7 @@ function TasksPageContent() {
   const [pillarFilter, setPillarFilter] = useState("all");
   const [editTask, setEditTask] = useState<KanbanTask | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const { user } = useAuth();
 
@@ -119,11 +122,17 @@ function TasksPageContent() {
 
   return (
     <div className="p-6 space-y-5">
-      <PageHeader
-        title="Tasks"
-        subtitle="All tasks across your projects"
-        icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
-      />
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title="Tasks"
+          subtitle="All tasks across your projects"
+          icon={<ClipboardCheck className="h-5 w-5 text-primary" />}
+        />
+        <BaseButton onClick={() => setAddDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" />
+          Add Task
+        </BaseButton>
+      </div>
 
       <div className="flex gap-2">
         {TASK_STATUSES.map((status) => {
@@ -206,6 +215,8 @@ function TasksPageContent() {
         task={editTask}
         productId={editTask?.productId ?? ""}
       />
+
+      <GlobalAddTaskDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
   );
 }

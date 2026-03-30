@@ -50,12 +50,20 @@ class ProgressMatcherService:
         if len(tasks) <= BATCH_SIZE:
             return await self._match_batch(tasks, trimmed, llm_cfg)
 
-        # Batch for large task lists
+        # Batch for large task lists — run in parallel
         batches = [tasks[i:i + BATCH_SIZE] for i in range(0, len(tasks), BATCH_SIZE)]
-        all_evidence: list[dict] = []
+        logger.info("Splitting %d tasks into %d batches (parallel)", len(tasks), len(batches))
 
-        for batch in batches:
-            result = await self._match_batch(batch, trimmed, llm_cfg)
+        results = await asyncio.gather(
+            *(self._match_batch(batch, trimmed, llm_cfg) for batch in batches),
+            return_exceptions=True,
+        )
+
+        all_evidence: list[dict] = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.warning("Batch %d failed: %s", i, result)
+                continue
             all_evidence.extend(result.get("task_evidence", []))
 
         summary = _compute_summary(all_evidence, len(tasks))
@@ -85,16 +93,26 @@ class ProgressMatcherService:
         )
 
         system_msg = HIGH_LEVEL_SYSTEM_PROMPT + TASK_EVIDENCE_SCHEMA
-        client = AsyncOpenAI(api_key=llm_cfg.api_key, base_url=llm_cfg.base_url)
+        client = AsyncOpenAI(
+            api_key=llm_cfg.api_key,
+            base_url=llm_cfg.base_url,
+            timeout=120.0,
+        )
 
-        response = await client.chat.completions.create(
-            model=llm_cfg.model,
-            messages=[
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.2,
-            max_tokens=llm_cfg.max_tokens,
+        # Use higher max_tokens for scan (each task needs ~200 tokens of output)
+        scan_max_tokens = max(llm_cfg.max_tokens, len(tasks) * 250 + 512)
+
+        response = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=llm_cfg.model,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0.2,
+                max_tokens=scan_max_tokens,
+            ),
+            timeout=180.0,
         )
 
         raw = response.choices[0].message.content or ""

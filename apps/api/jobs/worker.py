@@ -11,6 +11,6 @@ class WorkerSettings:
     functions = [generate_system_docs_job, high_level_scan_job]
     redis_settings = parse_redis_settings()
     max_jobs = 5
-    job_timeout = 600  # 10 minutes
+    job_timeout = 900  # 15 minutes
     max_tries = 2
     health_check_interval = 30

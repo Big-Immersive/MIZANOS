@@ -83,13 +83,18 @@ export function AddTaskDialog({
   const { isAdmin, isProjectManager, isEngineer } = useRoleVisibility();
   const canAssignOthers = isAdmin || isProjectManager || isEngineer;
 
-  const assigneeOptions = [
-    { value: "__none__", label: "Unassigned" },
-    ...members.map((m) => ({
-      value: m.profile_id,
-      label: `${m.profile?.full_name ?? m.profile?.email ?? "Unnamed"}${m.role ? ` — ${m.role}` : ""}`,
-    })),
-  ];
+  const assigneeOptions = (() => {
+    const seen = new Map<string, string>();
+    for (const m of members) {
+      const name = m.profile?.full_name ?? m.profile?.email ?? "Unnamed";
+      const existing = seen.get(m.profile_id);
+      seen.set(m.profile_id, existing ? `${name} — ${existing.split(" — ").pop()}, ${m.role}` : `${name}${m.role ? ` — ${m.role}` : ""}`);
+    }
+    return [
+      { value: "__none__", label: "Unassigned" },
+      ...Array.from(seen.entries()).map(([id, label]) => ({ value: id, label })),
+    ];
+  })();
 
   const defaultValues: TaskFormValues = {
     title: "",
@@ -126,7 +131,7 @@ export function AddTaskDialog({
       status: defaultStatus,
       assignee_id:
         !values.assignee_id || values.assignee_id === "__none__" ? undefined : values.assignee_id,
-      due_date: values.due_date || undefined,
+      due_date: values.due_date || new Date().toISOString().split("T")[0],
     });
   };
 

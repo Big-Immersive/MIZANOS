@@ -47,8 +47,10 @@ async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:
 
         # 10% — Clone repo
         await jctx.update_progress(job_id, 10, "Cloning repository")
+        logger.info("Job %s: starting clone for product %s", job_id, product_id)
         clone_svc = RepoCloneService(session)
         tmp_dir, commit_sha = await clone_svc.shallow_clone(product_id)
+        logger.info("Job %s: clone complete, commit %s", job_id, commit_sha[:8])
 
         # 30% — Extract artifacts
         await jctx.update_progress(job_id, 30, "Extracting code artifacts")
@@ -79,8 +81,8 @@ async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:
         await jctx.mark_completed(job_id, result_data=result)
 
     except Exception as exc:
-        logger.exception("Scan job %s failed", job_id)
-        await jctx.mark_failed(job_id, str(exc))
+        logger.exception("Scan job %s failed: %s", job_id, exc)
+        await jctx.mark_failed(job_id, str(exc)[:500])
     finally:
         if tmp_dir:
             RepoCloneService.cleanup(tmp_dir)

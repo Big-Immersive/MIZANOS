@@ -66,22 +66,36 @@ class RepoCloneService:
                 raw_token = await pat_svc.decrypt_token(product.github_pat_id)
                 verification = await pat_svc.verify_token(raw_token)
                 if verification["valid"]:
+                    logger.info("Using product PAT for clone (user: %s)", verification.get("github_username"))
                     return repo_url.replace("https://", f"https://x-access-token:{raw_token}@")
-            except Exception:
-                logger.warning("Failed to decrypt stored PAT, trying fallback token")
+                logger.warning("Product PAT is invalid/expired, trying fallback")
+            except Exception as exc:
+                logger.warning("Failed to decrypt stored PAT (%s), trying fallback token", exc)
 
         # Fallback to GITHUB_API_TOKEN from .env
         if settings.github_api_token:
+            logger.info("Using fallback GITHUB_API_TOKEN for clone")
             return repo_url.replace("https://", f"https://x-access-token:{settings.github_api_token}@")
 
         # No PAT — try public clone
+        logger.warning("No PAT available, attempting public clone for %s", repo_url)
         return repo_url
 
     @staticmethod
     async def _run_git_clone(clone_url: str, branch: str, dest: str) -> None:
+        # Prevent git from prompting for credentials (hangs in containers)
+        env = {
+            **__import__("os").environ,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_ASKPASS": "",
+            "GIT_SSH_COMMAND": "ssh -o BatchMode=yes",
+        }
         proc = await asyncio.create_subprocess_exec(
             "git", "clone", "--depth", "1", "--branch", branch, clone_url, dest,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
+            env=env,
         )
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=_CLONE_TIMEOUT)

@@ -102,19 +102,24 @@ export function TaskDetailDrawer({
   const { user } = useAuth();
   const { isAdmin, isProjectManager, isEngineer } = useRoleVisibility();
   const canManageTasks = isAdmin || isProjectManager || isEngineer;
+  const isAIEngineerOnly = isEngineer && !isAdmin && !isProjectManager;
   const isCreator = !!task?.createdBy && task.createdBy === user?.profile_id;
   const canEditDetails = canManageTasks || isCreator;
+  const canDeleteTask = canEditDetails && !isAIEngineerOnly;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const assigneeOptions = [
-    { value: "__none__", label: "Unassigned" },
-    ...[...members]
-      .sort((a, b) => (a.profile?.full_name ?? "").localeCompare(b.profile?.full_name ?? ""))
-      .map((m) => ({
-        value: m.profile_id,
-        label: `${m.profile?.full_name ?? m.profile?.email ?? "Unnamed"}${m.role ? ` — ${m.role}` : ""}`,
-      })),
-  ];
+  const assigneeOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const m of [...members].sort((a, b) => (a.profile?.full_name ?? "").localeCompare(b.profile?.full_name ?? ""))) {
+      const name = m.profile?.full_name ?? m.profile?.email ?? "Unnamed";
+      const existing = seen.get(m.profile_id);
+      seen.set(m.profile_id, existing ? `${name} — ${existing.split(" — ").pop()}, ${m.role}` : `${name}${m.role ? ` — ${m.role}` : ""}`);
+    }
+    return [
+      { value: "__none__", label: "Unassigned" },
+      ...Array.from(seen.entries()).map(([id, label]) => ({ value: id, label })),
+    ];
+  }, [members]);
 
   const {
     register,
@@ -237,7 +242,7 @@ export function TaskDetailDrawer({
             )}
 
             <div className="flex items-center gap-2 pt-1">
-              {canEditDetails && (
+              {canDeleteTask && (
                 <BaseButton
                   type="button"
                   variant="outline"

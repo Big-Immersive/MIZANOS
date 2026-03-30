@@ -47,7 +47,7 @@ async def list_tasks(
     task_type: str = Query("task"),
     include_drafts: bool = Query(False),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
+    page_size: int = Query(100, ge=1, le=500),
     user: CurrentUser = None,
     service: TaskService = Depends(get_service),
 ):
