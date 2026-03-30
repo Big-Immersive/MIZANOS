@@ -11,6 +11,7 @@ export function useTasks(productId: string) {
       const result = await tasksRepository.getByProduct(productId, {
         sortBy: "created_at",
         sortOrder: "desc",
+        page_size: 500,
       });
       // Backend returns a plain array, not paginated
       return Array.isArray(result) ? result : result.data ?? [];

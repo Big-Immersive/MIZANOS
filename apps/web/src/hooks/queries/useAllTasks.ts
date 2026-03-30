@@ -23,7 +23,7 @@ export function useAllTasks(filters: AllTasksFilters = {}) {
   return useQuery({
     queryKey: ["tasks", "all", cleanFilters],
     queryFn: async (): Promise<Task[]> => {
-      const result = await tasksRepository.getAll({ ...cleanFilters, task_type: "task" });
+      const result = await tasksRepository.getAll({ ...cleanFilters, task_type: "task", page_size: 500 });
       return Array.isArray(result) ? result : result.data ?? [];
     },
   });
