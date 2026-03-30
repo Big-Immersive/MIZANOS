@@ -31,7 +31,7 @@ import { useJob } from "@/hooks/queries/useJob";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TaskEvidence } from "@/lib/types";
 import { ScanSearch, RefreshCw, GitCommitHorizontal, Clock, XCircle, ChevronDown, ClipboardList } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 interface ScanProgressCardProps {
   productId: string;
@@ -83,26 +83,23 @@ function ScanProgressCard({ productId }: ScanProgressCardProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
-  const prevStatusRef = useRef<string | undefined>(undefined);
 
   // Pick up active job from summary (e.g. page reload while scan runs)
   const activeJobId = jobId ?? data?.active_job_id ?? null;
   const { data: job } = useJob(activeJobId);
 
-  const isScanning = triggerScan.isPending || (job?.status === "pending" || job?.status === "running");
+  const jobStatus = job?.status;
+  const isScanning = triggerScan.isPending || jobStatus === "pending" || jobStatus === "running";
 
   // When job finishes, refresh the progress summary automatically
   useEffect(() => {
-    const prev = prevStatusRef.current;
-    prevStatusRef.current = job?.status;
-    if (!prev || !job?.status) return;
-    const wasActive = prev === "pending" || prev === "running";
-    const nowDone = job.status === "completed" || job.status === "failed";
-    if (wasActive && nowDone) {
+    if (!activeJobId || !jobStatus) return;
+    const isDone = jobStatus === "completed" || jobStatus === "failed";
+    if (isDone) {
       queryClient.invalidateQueries({ queryKey: ["scans", productId] });
       setJobId(null);
     }
-  }, [job?.status, productId, queryClient]);
+  }, [activeJobId, jobStatus, productId, queryClient]);
 
   const handleScan = () => {
     triggerScan.mutate(undefined, {
