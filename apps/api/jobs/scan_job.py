@@ -13,16 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 def _serialize_task(task) -> dict:
-    """Serialize a Task ORM instance for the LLM prompt."""
-    return {
+    """Serialize a Task ORM instance for the LLM prompt (minimal fields to save tokens)."""
+    d = {
         "task_id": str(task.id),
         "title": task.title,
-        "description": task.description or "",
         "status": task.status or "backlog",
-        "priority": task.priority or "medium",
-        "pillar": task.pillar or "",
-        "verification_criteria": task.verification_criteria or "",
     }
+    if task.description:
+        d["description"] = task.description[:150]
+    if task.verification_criteria:
+        d["verification_criteria"] = task.verification_criteria[:200]
+    return d
 
 
 async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:

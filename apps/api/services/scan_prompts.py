@@ -1,97 +1,49 @@
 """Prompt templates for repository progress scanning."""
 
 HIGH_LEVEL_SYSTEM_PROMPT = """\
-You are a code progress analyzer for Mizan, a project management tool.
+You are a code progress analyzer. Given PM tasks and code artifacts, determine \
+which tasks have implementation evidence.
 
-Given PM tasks and extracted code artifacts from a repository, determine which \
-tasks have evidence of implementation in the codebase.
+For each task return: verified (bool), confidence (0.0-1.0), artifacts_found (list of files/routes), summary (one line).
 
-For each task, assess:
-- verified: true if there is reasonable evidence this task is implemented
-- confidence: 0.0-1.0 indicating how confident you are
-- artifacts_found: list of specific files, routes, models, or functions that serve as evidence
-- summary: one-line explanation
+Rules:
+- Semantic matching: "User auth" matches auth, login, jwt, session files.
+- verification_criteria is the primary signal when present.
+- verified=true if 2-3 relevant artifacts found (routes, models, components, functions).
+- Partial: some artifacts but incomplete coverage → verified=false, confidence=0.4-0.6.
+- PM status "done" + any matching artifact → confidence >= 0.5.
+- File paths count as evidence.
 
-Matching Rules:
-1. Use SEMANTIC matching — match by intent, not exact names. \
-A task "User authentication" matches files with auth, login, jwt, session, etc.
-2. If a task has "verification_criteria", use it as the PRIMARY indicator.
-3. Otherwise, infer what code would exist if the task were completed.
-4. A task "Create X API" matches route definitions, service files, handler functions.
-5. A task "Add Y page" matches page files, component files, UI components.
-6. A task "Database model for Z" matches model definitions with relevant fields.
-7. Use field_types and docstrings when available for better matching.
-8. Use function signatures and handler names to identify implementation.
-9. Mark verified=true if you find reasonable evidence (matching routes, models, \
-components, or functions). You don't need every single artifact — finding 2-3 \
-relevant ones is sufficient.
-10. If some artifacts exist but coverage is incomplete (model exists but no route), \
-set verified=false but confidence=0.4-0.6 and mark as PARTIAL.
-11. If a task status in PM is "done" or "completed" and you find ANY related \
-artifact (even a single matching file), give it confidence >= 0.5.
-12. File tree paths are a valid signal — if a task mentions "notifications" and \
-you see files like notification_service.py, notifications.tsx, etc., that counts.
-
-Return ONLY valid JSON matching this exact schema — no markdown fences, no explanation:
+Return ONLY valid JSON, no markdown fences:
 """
 
 TASK_EVIDENCE_SCHEMA = """\
-{
-  "scan_summary": {
-    "total_tasks": <int>,
-    "verified": <int>,
-    "partial": <int>,
-    "no_evidence": <int>,
-    "progress_pct": <float 0-100>
-  },
-  "task_evidence": [
-    {
-      "task_id": "<uuid>",
-      "task_title": "<string>",
-      "status_in_pm": "<string>",
-      "verified": <bool>,
-      "confidence": <float 0.0-1.0>,
-      "artifacts_found": ["<file_or_route>"],
-      "summary": "<one-line reasoning>"
-    }
-  ]
-}
+{"scan_summary":{"total_tasks":<int>,"verified":<int>,"partial":<int>,"no_evidence":<int>,"progress_pct":<float>},"task_evidence":[{"task_id":"<uuid>","task_title":"<str>","status_in_pm":"<str>","verified":<bool>,"confidence":<float>,"artifacts_found":["<file>"],"summary":"<one line>"}]}
 """
 
 HIGH_LEVEL_USER_TEMPLATE = """\
-## Project Summary
-- {task_count} tasks to analyze
-- {file_count} code files in repository
-- {route_count} API routes found
-- {model_count} database models found
-- {schema_count} validation schemas found
-- {component_count} UI components found
-- {function_count} functions found
+{task_count} tasks | {file_count} files | {route_count} routes | {model_count} models | {schema_count} schemas | {component_count} components | {function_count} functions
 {truncation_note}
-
-## Tasks from Project Management
-
+## Tasks
 {tasks_json}
 
-## Code Artifacts
-
-### Routes (API endpoints)
+## Routes
 {routes_json}
 
-### Models (database)
+## Models
 {models_json}
 
-### Schemas (validation)
+## Schemas
 {schemas_json}
 
-### Components (UI)
+## Components
 {components_json}
 
-### Functions (business logic)
+## Functions
 {functions_json}
 
-### File Tree (all code files)
+## Files
 {file_tree_json}
 
-Analyze each task and return the JSON result. Use semantic matching.
+Match each task to code artifacts. Return JSON only.
 """

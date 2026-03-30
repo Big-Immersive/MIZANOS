@@ -25,12 +25,12 @@ _DEFAULT_RESULT = {
 }
 
 _CATEGORY_LIMITS = {
-    "file_tree": 300, "routes": 150, "models": 100,
-    "schemas": 100, "components": 150, "functions": 150,
-    "pages": 100, "migrations": 50, "configs": 20,
+    "file_tree": 120, "routes": 80, "models": 60,
+    "schemas": 50, "components": 80, "functions": 80,
+    "pages": 50, "migrations": 20, "configs": 10,
 }
 
-BATCH_SIZE = 18
+BATCH_SIZE = 20
 
 
 class ProgressMatcherService:
@@ -69,10 +69,27 @@ class ProgressMatcherService:
         summary = _compute_summary(all_evidence, len(tasks))
         return {"scan_summary": summary, "task_evidence": all_evidence}
 
+    @staticmethod
+    def _compact_tasks(tasks: list[dict]) -> list[dict]:
+        """Strip task fields the LLM doesn't need to reduce input tokens."""
+        return [
+            {
+                "task_id": t["task_id"],
+                "title": t["title"],
+                "description": (t.get("description") or "")[:150],
+                "status": t.get("status", ""),
+                "verification_criteria": (t.get("verification_criteria") or "")[:200],
+            }
+            for t in tasks
+        ]
+
     async def _match_batch(self, tasks: list[dict], artifacts: dict, llm_cfg) -> dict:
         """Match a single batch of tasks against artifacts."""
-        tasks_json = json.dumps(tasks, indent=2, default=str)
+        compact_tasks = self._compact_tasks(tasks)
+        tasks_json = json.dumps(compact_tasks, separators=(",", ":"), default=str)
         truncation_note = self._truncation_note(artifacts)
+
+        _dump = lambda v: json.dumps(v, separators=(",", ":"))
 
         user_msg = HIGH_LEVEL_USER_TEMPLATE.format(
             task_count=len(tasks),
@@ -84,12 +101,12 @@ class ProgressMatcherService:
             function_count=len(artifacts.get("functions", [])),
             truncation_note=truncation_note,
             tasks_json=tasks_json,
-            routes_json=json.dumps(artifacts.get("routes", []), indent=1),
-            models_json=json.dumps(artifacts.get("models", []), indent=1),
-            schemas_json=json.dumps(artifacts.get("schemas", []), indent=1),
-            components_json=json.dumps(artifacts.get("components", []), indent=1),
-            functions_json=json.dumps(artifacts.get("functions", []), indent=1),
-            file_tree_json=json.dumps(artifacts.get("file_tree", []), indent=1),
+            routes_json=_dump(artifacts.get("routes", [])),
+            models_json=_dump(artifacts.get("models", [])),
+            schemas_json=_dump(artifacts.get("schemas", [])),
+            components_json=_dump(artifacts.get("components", [])),
+            functions_json=_dump(artifacts.get("functions", [])),
+            file_tree_json="\n".join(artifacts.get("file_tree", [])),
         )
 
         system_msg = HIGH_LEVEL_SYSTEM_PROMPT + TASK_EVIDENCE_SCHEMA
@@ -99,8 +116,8 @@ class ProgressMatcherService:
             timeout=120.0,
         )
 
-        # Use higher max_tokens for scan (each task needs ~200 tokens of output)
-        scan_max_tokens = max(llm_cfg.max_tokens, len(tasks) * 250 + 512)
+        # Lean max_tokens: ~120 tokens per task for output JSON
+        scan_max_tokens = min(max(llm_cfg.max_tokens, len(tasks) * 120 + 256), 4096)
 
         response = await asyncio.wait_for(
             client.chat.completions.create(
