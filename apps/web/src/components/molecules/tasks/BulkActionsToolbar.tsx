@@ -78,7 +78,7 @@ export function BulkActionsToolbar({
   return (
     <>
       <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 flex-wrap">
-        <BaseCheckbox checked={allSelected} onCheckedChange={onToggleAll} />
+        <BaseCheckbox checked={hasSelection} onCheckedChange={onToggleAll} />
         <span className="text-sm font-medium">
           {hasSelection
             ? `${selectedIds.size} of ${taskCount} selected`
