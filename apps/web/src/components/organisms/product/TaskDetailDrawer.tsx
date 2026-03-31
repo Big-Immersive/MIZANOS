@@ -257,7 +257,7 @@ export function TaskDetailDrawer({
                         ? "Today"
                         : new Date(task.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                     </p>
-                    {task.dueDate && new Date(task.updatedAt) > new Date(task.dueDate) && (
+                    {task.dueDate && new Date(task.updatedAt).toDateString() !== new Date(task.dueDate).toDateString() && new Date(task.updatedAt).setHours(0,0,0,0) > new Date(task.dueDate).setHours(0,0,0,0) && (
                       <p className="text-xs text-destructive font-medium">
                         Task was completed after due date
                       </p>
