@@ -235,10 +235,36 @@ export function TaskDetailDrawer({
             )}
 
             {canEditDetails && (
-              <div className="space-y-1">
-                <BaseLabel htmlFor="drawer-due">Due Date</BaseLabel>
-                <BaseInput id="drawer-due" type="date" min={new Date().toISOString().split("T")[0]} {...register("due_date")} />
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <BaseLabel htmlFor="drawer-due">Due Date</BaseLabel>
+                    <BaseInput id="drawer-due" type="date" min={new Date().toISOString().split("T")[0]} {...register("due_date")} disabled={isAIEngineerOnly} />
+                  </div>
+                  <div className="space-y-1">
+                    <BaseLabel>Created Date</BaseLabel>
+                    <p className="text-sm text-muted-foreground rounded-md border px-3 py-2">
+                      {task?.createdAt ? new Date(task.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {!isAIEngineerOnly && currentStatus === "done" && task?.updatedAt && (
+                  <div className="space-y-1">
+                    <BaseLabel>Done Date</BaseLabel>
+                    <p className="text-sm text-foreground rounded-md border px-3 py-2">
+                      {new Date(task.updatedAt).toDateString() === new Date().toDateString()
+                        ? "Today"
+                        : new Date(task.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                    </p>
+                    {task.dueDate && new Date(task.updatedAt) > new Date(task.dueDate) && (
+                      <p className="text-xs text-destructive font-medium">
+                        Task was completed after due date
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex items-center gap-2 pt-1">

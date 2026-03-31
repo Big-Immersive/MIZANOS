@@ -571,11 +571,12 @@ class ReportService:
             return None
 
     async def get_tasks_for_report(self, product_ids: list[UUID]) -> dict[UUID, dict]:
-        """Return per-project task summary + non-done task list + links + code progress for reports."""
+        """Return per-project task summary + in-progress & done-today tasks + links + code progress."""
         task_counts = await self._fetch_task_counts(product_ids)
         links_map = await self._fetch_project_links(product_ids)
         code_progress = await self._fetch_code_progress_batch(product_ids)
         result: dict[UUID, dict] = {}
+        today = datetime.now(timezone.utc).date()
 
         for pid in product_ids:
             tc = task_counts.get(pid, {})
@@ -587,20 +588,58 @@ class ReportService:
 
             summary = f"Tasks: {total} total | {done} Done | {in_progress} In Progress | {backlog} Backlog | Code Progress: {cp}%"
 
-            all_tasks = await self._fetch_task_details_for_ai(pid)
-            non_done = [
-                t for t in all_tasks
-                if (t.get("status") or "").lower() not in COMPLETED_STATUSES
-            ]
+            all_tasks = await self._fetch_task_details_for_report(pid, today)
 
             result[pid] = {
                 "summary_line": summary,
-                "non_done_tasks": non_done,
+                "non_done_tasks": all_tasks,
                 "links": links_map.get(pid, []),
                 "code_progress": cp,
             }
 
         return result
+
+    async def _fetch_task_details_for_report(self, product_id: UUID, today) -> list[dict]:
+        """Fetch in-progress tasks + tasks completed today for report."""
+        from apps.api.models.user import Profile
+
+        stmt = (
+            select(
+                Task.title, Task.status, Task.priority,
+                Task.due_date, Task.updated_at,
+                Profile.full_name.label("assignee_name"),
+            )
+            .outerjoin(Profile, Task.assignee_id == Profile.id)
+            .where(
+                Task.product_id == product_id,
+                Task.task_type == "task",
+                Task.is_draft == False,  # noqa: E712
+            )
+            .order_by(Task.status, Task.priority.desc())
+        )
+        result = await self.session.execute(stmt)
+        tasks = []
+        for row in result.all():
+            status = (row.status or "").lower()
+            is_in_progress = status in IN_PROGRESS_STATUSES
+            is_done_today = (
+                status in COMPLETED_STATUSES
+                and row.updated_at is not None
+                and row.updated_at.date() == today
+            )
+            if not is_in_progress and not is_done_today:
+                continue
+            tag = "DONE TODAY" if is_done_today else row.status.upper().replace("_", " ")
+            tasks.append({
+                "title": row.title,
+                "status": row.status or "unknown",
+                "priority": row.priority or "none",
+                "assignee_name": row.assignee_name or "Unassigned",
+                "due_date": row.due_date.isoformat() if row.due_date else None,
+                "is_overdue": False,
+                "tag": tag,
+            })
+        return tasks
 
     async def _fetch_code_progress_batch(self, product_ids: list[UUID]) -> dict[UUID, float]:
         """Return {product_id: progress_pct} from latest RepositoryAnalysis."""

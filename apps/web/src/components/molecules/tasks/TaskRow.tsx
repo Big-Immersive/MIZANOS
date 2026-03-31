@@ -3,6 +3,13 @@
 import { Badge } from "@/components/atoms/display/Badge";
 import { BaseCheckbox } from "@/components/atoms/inputs/BaseCheckbox";
 import { ClaudeCodePrompt } from "@/components/molecules/tasks/ClaudeCodePrompt";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/atoms/inputs/BaseSelect";
 import { TASK_STATUS_DISPLAY, TASK_PRIORITY_COLORS, type TaskStatusConfig } from "@/lib/constants";
 import type { Task } from "@/lib/types";
 import { MessageSquare, User } from "lucide-react";
@@ -13,11 +20,12 @@ interface TaskRowProps {
   assigneeName?: string;
   onToggle: () => void;
   onClick: () => void;
+  onStatusChange?: (taskId: string, status: string) => void;
   statusDisplay?: Record<string, TaskStatusConfig>;
   hideCheckbox?: boolean;
 }
 
-export function TaskRow({ task, selected, assigneeName, onToggle, onClick, statusDisplay, hideCheckbox }: TaskRowProps) {
+export function TaskRow({ task, selected, assigneeName, onToggle, onClick, onStatusChange, statusDisplay, hideCheckbox }: TaskRowProps) {
   const display = statusDisplay ?? TASK_STATUS_DISPLAY;
   const fallbackKey = statusDisplay ? Object.keys(display)[0] : "backlog";
   const statusConfig = display[task.status ?? fallbackKey] ?? display[fallbackKey];
@@ -89,9 +97,29 @@ export function TaskRow({ task, selected, assigneeName, onToggle, onClick, statu
               Unassigned
             </span>
           )}
-          <Badge variant="outline" className="text-xs">
-            {statusConfig.label}
-          </Badge>
+          {onStatusChange ? (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Select
+                value={task.status ?? "backlog"}
+                onValueChange={(v) => onStatusChange(task.id, v)}
+              >
+                <SelectTrigger className="h-7 w-[110px] text-xs border-muted">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(display).map(([value, cfg]) => (
+                    <SelectItem key={value} value={value} className="text-xs">
+                      {cfg.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              {statusConfig.label}
+            </Badge>
+          )}
         </div>
       </div>
       {task.claude_code_prompt && (

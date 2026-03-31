@@ -211,12 +211,10 @@ class ReportDocumentService:
                 run.font.size = Pt(9)
                 run.font.color.rgb = RGBColor(80, 80, 80)
 
-            # Non-done tasks: bullet + title + small tag at end, no dev name
-            non_done = td.get("non_done_tasks", [])
-            for t in non_done:
-                is_overdue = t.get("is_overdue", False)
-                status_raw = (t.get("status") or "unknown").upper()
-                tag = "OVERDUE" if is_overdue else status_raw
+            # In-progress + done-today tasks
+            report_tasks = td.get("non_done_tasks", [])
+            for t in report_tasks:
+                tag = t.get("tag", (t.get("status") or "unknown").upper())
                 title = t.get("title", "")[:65]
 
                 tp = doc.add_paragraph(style="List Bullet")
@@ -224,9 +222,9 @@ class ReportDocumentService:
                 run.font.size = Pt(9)
                 run = tp.add_run(f"  [{tag}]")
                 run.font.size = Pt(7)
-                if is_overdue:
-                    run.font.color.rgb = RGBColor(200, 0, 0)
-                elif status_raw in ("IN_PROGRESS", "IN_REVIEW", "REVIEW"):
+                if tag == "DONE TODAY":
+                    run.font.color.rgb = RGBColor(0, 150, 0)
+                elif tag in ("IN PROGRESS", "IN REVIEW", "REVIEW"):
                     run.font.color.rgb = RGBColor(180, 100, 0)
                 else:
                     run.font.color.rgb = RGBColor(130, 130, 130)

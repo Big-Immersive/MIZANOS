@@ -12,7 +12,7 @@ import { toKanbanTask } from "@/components/organisms/kanban/kanban-utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/hooks/queries/useTasks";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
-import { useCreateTask } from "@/hooks/mutations/useTaskMutations";
+import { useCreateTask, useUpdateTask } from "@/hooks/mutations/useTaskMutations";
 import { TASK_STATUS_DISPLAY } from "@/lib/constants";
 import type { KanbanTask, TaskStatus, TaskPriority } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/atoms/inputs/BaseSelect";
@@ -35,6 +35,11 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const createTask = useCreateTask(productId);
+  const updateTask = useUpdateTask(productId);
+
+  const handleStatusChange = useCallback((taskId: string, status: string) => {
+    updateTask.mutate({ id: taskId, status });
+  }, [updateTask]);
 
   const assigneeMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -57,18 +62,24 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
     }
   }, [openTaskId, tasks, isLoading, assigneeMap]);
 
+  const STATUS_SORT_ORDER: Record<string, number> = {
+    in_progress: 0, review: 1, backlog: 2, done: 3, live: 4, cancelled: 5,
+  };
+
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    return tasks.filter((task) => {
-      if (myTasksOnly && user?.profile_id && task.assignee_id !== user.profile_id && task.created_by !== user.profile_id) return false;
-      if (statusFilter !== "all" && task.status !== statusFilter) return false;
-      if (priorityFilter !== "all" && task.priority !== priorityFilter) return false;
-      if (!myTasksOnly) {
-        if (assigneeFilter === "__unassigned__" && task.assignee_id) return false;
-        if (assigneeFilter !== "all" && assigneeFilter !== "__unassigned__" && task.assignee_id !== assigneeFilter) return false;
-      }
-      return true;
-    });
+    return tasks
+      .filter((task) => {
+        if (myTasksOnly && user?.profile_id && task.assignee_id !== user.profile_id && task.created_by !== user.profile_id) return false;
+        if (statusFilter !== "all" && task.status !== statusFilter) return false;
+        if (priorityFilter !== "all" && task.priority !== priorityFilter) return false;
+        if (!myTasksOnly) {
+          if (assigneeFilter === "__unassigned__" && task.assignee_id) return false;
+          if (assigneeFilter !== "all" && assigneeFilter !== "__unassigned__" && task.assignee_id !== assigneeFilter) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (STATUS_SORT_ORDER[a.status ?? "backlog"] ?? 9) - (STATUS_SORT_ORDER[b.status ?? "backlog"] ?? 9));
   }, [tasks, statusFilter, priorityFilter, assigneeFilter, myTasksOnly, user?.profile_id]);
 
   const toggleSelect = useCallback((id: string) => {
@@ -187,7 +198,7 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
             <SelectContent>
               <SelectItem value="all">All assignees</SelectItem>
               <SelectItem value="__unassigned__">Unassigned</SelectItem>
-              {members.map((m) => (
+              {Array.from(new Map(members.map((m) => [m.profile_id, m])).values()).map((m) => (
                 <SelectItem key={m.profile_id} value={m.profile_id}>
                   {m.profile?.full_name ?? m.profile?.email ?? "Unknown"}
                 </SelectItem>
@@ -223,6 +234,7 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
               setEditTask(toKanbanTask(task, assigneeMap));
               setEditDialogOpen(true);
             }}
+            onStatusChange={handleStatusChange}
           />
         ))}
       </div>

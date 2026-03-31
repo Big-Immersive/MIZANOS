@@ -31,6 +31,7 @@ const taskSchema = z.object({
   pillar: z.enum(["business", "marketing", "development", "product"]),
   priority: z.enum(["low", "medium", "high", "critical", "production_bug"]),
   due_date: z.string().optional(),
+  created_at: z.string().optional(),
   assignee_id: z.string().optional(),
 });
 
@@ -102,6 +103,7 @@ export function AddTaskDialog({
     pillar: "development",
     priority: "medium",
     due_date: "",
+    created_at: "",
     assignee_id: "",
   };
 
@@ -132,6 +134,7 @@ export function AddTaskDialog({
       assignee_id:
         !values.assignee_id || values.assignee_id === "__none__" ? undefined : values.assignee_id,
       due_date: values.due_date || new Date().toISOString().split("T")[0],
+      created_at: values.created_at ? new Date(values.created_at).toISOString() : new Date().toISOString(),
     });
   };
 
@@ -217,15 +220,26 @@ export function AddTaskDialog({
             />
           </div>
 
-          {/* Due date */}
-          <div className="space-y-2">
-            <BaseLabel htmlFor="task-due-date">Due Date</BaseLabel>
-            <BaseInput
-              id="task-due-date"
-              type="date"
-              min={new Date().toISOString().split("T")[0]}
-              {...register("due_date")}
-            />
+          {/* Due date + Created date row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <BaseLabel htmlFor="task-due-date">Due Date</BaseLabel>
+              <BaseInput
+                id="task-due-date"
+                type="date"
+                min={new Date().toISOString().split("T")[0]}
+                {...register("due_date")}
+              />
+            </div>
+            <div className="space-y-2">
+              <BaseLabel htmlFor="task-created-date">Created Date</BaseLabel>
+              <BaseInput
+                id="task-created-date"
+                type="date"
+                {...register("created_at")}
+              />
+              <p className="text-xs text-muted-foreground">Defaults to today</p>
+            </div>
           </div>
 
           {/* Actions */}

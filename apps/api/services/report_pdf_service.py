@@ -151,14 +151,12 @@ class ReportPDFService:
                 pdf.set_text_color(60, 60, 60)
                 pdf.cell(0, 6, _sanitize_text(summary_line), new_x="LMARGIN", new_y="NEXT")
 
-            # Non-done tasks: bullet + title + small tag at end
-            non_done = td.get("non_done_tasks", [])
-            for t in non_done:
+            # In-progress + done-today tasks
+            report_tasks = td.get("non_done_tasks", [])
+            for t in report_tasks:
                 if pdf.get_y() > pdf.h - 20:
                     pdf.add_page()
-                is_overdue = t.get("is_overdue", False)
-                status_raw = (t.get("status") or "unknown").upper()
-                tag = "OVERDUE" if is_overdue else status_raw
+                tag = t.get("tag", (t.get("status") or "unknown").upper())
                 title = _sanitize_text(t.get("title", ""))[:65]
 
                 pdf.set_x(pdf.l_margin + 6)
@@ -166,11 +164,10 @@ class ReportPDFService:
                 pdf.set_text_color(0, 0, 0)
                 pdf.cell(4, 5, "*")
                 pdf.cell(0, 5, f" {title}", new_x="END")
-                # Small tag at end
                 pdf.set_font("Helvetica", "", 6)
-                if is_overdue:
-                    pdf.set_text_color(200, 0, 0)
-                elif status_raw in ("IN_PROGRESS", "IN_REVIEW", "REVIEW"):
+                if tag == "DONE TODAY":
+                    pdf.set_text_color(0, 150, 0)
+                elif tag in ("IN PROGRESS", "IN REVIEW", "REVIEW"):
                     pdf.set_text_color(180, 100, 0)
                 else:
                     pdf.set_text_color(130, 130, 130)

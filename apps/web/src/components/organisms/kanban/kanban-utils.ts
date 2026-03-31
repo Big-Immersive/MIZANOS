@@ -37,6 +37,7 @@ export function toKanbanTask(
     commentCount: task.comment_count ?? 0,
     replyCount: task.reply_count ?? 0,
     createdAt: task.created_at,
+    updatedAt: task.updated_at ?? undefined,
     subtaskCount: task.subtask_count ?? 0,
   };
 }

@@ -32,6 +32,7 @@ const taskSchema = z.object({
   pillar: z.enum(["business", "marketing", "development", "product"]),
   priority: z.enum(["low", "medium", "high", "critical", "production_bug"]),
   due_date: z.string().optional(),
+  created_at: z.string().optional(),
   assignee_id: z.string().optional(),
 });
 
@@ -96,6 +97,7 @@ export function GlobalAddTaskDialog({ open, onOpenChange }: GlobalAddTaskDialogP
       pillar: "development",
       priority: "medium",
       due_date: "",
+      created_at: "",
       assignee_id: "",
     },
   });
@@ -139,6 +141,7 @@ export function GlobalAddTaskDialog({ open, onOpenChange }: GlobalAddTaskDialogP
         status: "backlog" as TaskStatus,
         assignee_id: !rest.assignee_id || rest.assignee_id === "__none__" ? undefined : rest.assignee_id,
         due_date: rest.due_date || TODAY(),
+        created_at: rest.created_at ? new Date(rest.created_at).toISOString() : new Date().toISOString(),
       },
       { onSuccess: () => onOpenChange(false) },
     );
@@ -236,16 +239,27 @@ export function GlobalAddTaskDialog({ open, onOpenChange }: GlobalAddTaskDialogP
             />
           </div>
 
-          {/* Due date */}
-          <div className="space-y-2">
-            <BaseLabel htmlFor="global-task-due">Due Date</BaseLabel>
-            <BaseInput
-              id="global-task-due"
-              type="date"
-              min={TODAY()}
-              {...register("due_date")}
-            />
-            <p className="text-xs text-muted-foreground">Defaults to today if left empty</p>
+          {/* Due date + Created date row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <BaseLabel htmlFor="global-task-due">Due Date</BaseLabel>
+              <BaseInput
+                id="global-task-due"
+                type="date"
+                min={TODAY()}
+                {...register("due_date")}
+              />
+              <p className="text-xs text-muted-foreground">Defaults to today</p>
+            </div>
+            <div className="space-y-2">
+              <BaseLabel htmlFor="global-task-created">Created Date</BaseLabel>
+              <BaseInput
+                id="global-task-created"
+                type="date"
+                {...register("created_at")}
+              />
+              <p className="text-xs text-muted-foreground">Defaults to today</p>
+            </div>
           </div>
 
           {/* Actions */}

@@ -3,7 +3,9 @@ export const PRODUCT_STAGES = [
   "Development",
   "QA",
   "Security",
-  "Deployment",
+  "Dev Ready",
+  "Soft Launch",
+  "Launched",
   "Live",
   "On Hold",
 ] as const;

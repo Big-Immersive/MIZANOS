@@ -76,6 +76,7 @@ export interface KanbanTask {
   commentCount: number;
   replyCount: number;
   createdAt: string;
+  updatedAt?: string;
   subtaskCount?: number;
 }
 
