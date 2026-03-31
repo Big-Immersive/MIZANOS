@@ -57,7 +57,7 @@ function TeamCard({ members }: { members: ProductMember[] }) {
 function deriveStage(tasks: { status?: string | null }[]): ProductStage | null {
   if (tasks.length === 0) return null;
   const allDoneOrLive = tasks.every((t) => t.status === "done" || t.status === "live");
-  if (allDoneOrLive) return "Live";
+  if (allDoneOrLive) return "Launched";
   const allReviewOrLater = tasks.every((t) => t.status === "review" || t.status === "done" || t.status === "live");
   if (allReviewOrLater) return "QA";
   const noneInBacklog = tasks.every((t) => t.status !== "backlog");
