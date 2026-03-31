@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 COMPLETED_STATUSES = {"done", "completed", "verified", "live", "fixed"}
 IN_PROGRESS_STATUSES = {"in_progress", "in_review", "review"}
+STAGE_ORDER = ["Intake", "Development", "QA", "Security", "Dev Ready", "Soft Launch", "Launched", "On Hold"]
 
 # In-memory cache for GitHub commit data (refreshes every 5 minutes)
 _commit_cache: dict[str, tuple[dict, dict, float]] = {}
@@ -92,7 +93,10 @@ class ReportService:
     async def _fetch_products(self) -> list:
         stmt = select(Product).where(Product.archived_at.is_(None)).order_by(Product.name)
         result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        products = list(result.scalars().all())
+        stage_idx = {s: i for i, s in enumerate(STAGE_ORDER)}
+        products.sort(key=lambda p: stage_idx.get(p.stage or "Intake", 99))
+        return products
 
     async def _fetch_product(self, product_id: UUID) -> Product:
         stmt = select(Product).where(Product.id == product_id)
