@@ -81,7 +81,7 @@ export function useBulkUpdateTasks(productId: string) {
       updates,
     }: {
       taskIds: string[];
-      updates: { assignee_id?: string | null; due_date?: string | null; priority?: string };
+      updates: { assignee_id?: string | null; due_date?: string | null; priority?: string; status?: string; pillar?: string };
     }) => tasksRepository.bulkUpdateTasks(taskIds, updates),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["tasks", productId] });

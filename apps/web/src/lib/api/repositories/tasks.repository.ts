@@ -115,7 +115,7 @@ export class TasksRepository extends BaseRepository<Task> {
 
   async bulkUpdateTasks(
     taskIds: string[],
-    updates: { assignee_id?: string | null; due_date?: string | null; priority?: string },
+    updates: { assignee_id?: string | null; due_date?: string | null; priority?: string; status?: string; pillar?: string },
   ): Promise<BulkUpdateResponse> {
     const response = await this.client.post<BulkUpdateResponse>(
       `${this.basePath}/bulk-update`,

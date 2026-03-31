@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, Calendar, ArrowUpDown } from "lucide-react";
+import { UserPlus, Calendar, ArrowUpDown, Activity, Layers, Trash2 } from "lucide-react";
 import { BaseCheckbox } from "@/components/atoms/inputs/BaseCheckbox";
 import { BaseInput } from "@/components/atoms/inputs/BaseInput";
 import { Button } from "@/components/molecules/buttons/Button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/atoms/layout/Popover";
 import {
   Select,
   SelectContent,
@@ -12,8 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/atoms/inputs/BaseSelect";
+import { DeleteTaskDialog } from "@/components/molecules/feedback/DeleteTaskDialog";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
-import { useBulkUpdateTasks } from "@/hooks/mutations/useTaskMutations";
+import { useBulkUpdateTasks, useDeleteTask } from "@/hooks/mutations/useTaskMutations";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 
 interface BulkActionsToolbarProps {
@@ -24,7 +30,6 @@ interface BulkActionsToolbarProps {
   productId: string;
 }
 
-type ActiveAction = "assign" | "dueDate" | "priority" | null;
 const UNASSIGNED_VALUE = "__unassigned__";
 
 export function BulkActionsToolbar({
@@ -34,145 +39,162 @@ export function BulkActionsToolbar({
   onClearSelection,
   productId,
 }: BulkActionsToolbarProps) {
-  const [activeAction, setActiveAction] = useState<ActiveAction>(null);
-  const [selectedAssignee, setSelectedAssignee] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedPriority, setSelectedPriority] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { data: members = [] } = useProductMembers(productId);
   const bulkUpdate = useBulkUpdateTasks(productId);
-  const { isAdmin, isProjectManager } = useRoleVisibility();
-  const canManageTasks = isAdmin || isProjectManager;
+  const deleteTask = useDeleteTask(productId);
+  const { isAdmin, isProjectManager, isEngineer } = useRoleVisibility();
+  const isAIEngineerOnly = isEngineer && !isAdmin && !isProjectManager;
+  const canManageTasks = isAdmin || isProjectManager || isEngineer;
+  const canDelete = canManageTasks && !isAIEngineerOnly;
+  const canEditDueDate = canManageTasks && !isAIEngineerOnly;
 
   const allSelected = taskCount > 0 && selectedIds.size === taskCount;
   const hasSelection = selectedIds.size > 0;
+  const taskIds = [...selectedIds];
 
-  const handleApply = () => {
-    if (!hasSelection) return;
-    const taskIds = [...selectedIds];
-
-    if (activeAction === "assign" && selectedAssignee) {
-      const assigneeId = selectedAssignee === UNASSIGNED_VALUE ? null : selectedAssignee;
-      bulkUpdate.mutate(
-        { taskIds, updates: { assignee_id: assigneeId } },
-        { onSuccess: resetState },
-      );
-    } else if (activeAction === "dueDate" && selectedDate) {
-      bulkUpdate.mutate(
-        { taskIds, updates: { due_date: selectedDate } },
-        { onSuccess: resetState },
-      );
-    } else if (activeAction === "priority" && selectedPriority) {
-      bulkUpdate.mutate(
-        { taskIds, updates: { priority: selectedPriority } },
-        { onSuccess: resetState },
-      );
-    }
+  const applyUpdate = (updates: Record<string, unknown>) => {
+    bulkUpdate.mutate(
+      { taskIds, updates },
+      { onSuccess: onClearSelection },
+    );
   };
 
-  const resetState = () => {
-    onClearSelection();
-    setActiveAction(null);
-    setSelectedAssignee("");
-    setSelectedDate("");
-    setSelectedPriority("");
+  const handleBulkDelete = () => {
+    const ids = [...selectedIds];
+    const deleteNext = (i: number) => {
+      if (i >= ids.length) {
+        setDeleteDialogOpen(false);
+        onClearSelection();
+        return;
+      }
+      deleteTask.mutate(ids[i], { onSuccess: () => deleteNext(i + 1) });
+    };
+    deleteNext(0);
   };
+
+  const uniqueMembers = Array.from(new Map(members.map((m) => [m.profile_id, m])).values());
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-      <BaseCheckbox checked={allSelected} onCheckedChange={onToggleAll} />
-      <span className="text-sm font-medium">
-        {hasSelection
-          ? `${selectedIds.size} of ${taskCount} selected`
-          : `${taskCount} task${taskCount !== 1 ? "s" : ""}`}
-      </span>
+    <>
+      <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 flex-wrap">
+        <BaseCheckbox checked={allSelected} onCheckedChange={onToggleAll} />
+        <span className="text-sm font-medium">
+          {hasSelection
+            ? `${selectedIds.size} of ${taskCount} selected`
+            : `${taskCount} task${taskCount !== 1 ? "s" : ""}`}
+        </span>
 
-      {canManageTasks && (
-        <>
-          <span className="text-xs text-muted-foreground border-l pl-3 ml-1">Bulk Actions:</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={activeAction === "assign" ? "default" : "outline"}
-              size="sm"
-              disabled={!hasSelection}
-              onClick={() => setActiveAction(activeAction === "assign" ? null : "assign")}
-              className="h-8"
-            >
-              <UserPlus className="h-4 w-4 mr-1.5" />
-              Assign
-            </Button>
-            <Button
-              variant={activeAction === "dueDate" ? "default" : "outline"}
-              size="sm"
-              disabled={!hasSelection}
-              onClick={() => setActiveAction(activeAction === "dueDate" ? null : "dueDate")}
-              className="h-8"
-            >
-              <Calendar className="h-4 w-4 mr-1.5" />
-              Due Date
-            </Button>
-            <Button
-              variant={activeAction === "priority" ? "default" : "outline"}
-              size="sm"
-              disabled={!hasSelection}
-              onClick={() => setActiveAction(activeAction === "priority" ? null : "priority")}
-              className="h-8"
-            >
-              <ArrowUpDown className="h-4 w-4 mr-1.5" />
-              Priority
-            </Button>
-          </div>
+        {canManageTasks && (
+          <>
+            <span className="text-xs text-muted-foreground border-l pl-2 ml-1">Bulk:</span>
 
-          {activeAction === "assign" && (
-            <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
-              <SelectTrigger className="w-[180px] h-8 text-sm">
-                <SelectValue placeholder="Select assignee" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNASSIGNED_VALUE}>Unassigned</SelectItem>
-                {members.map((m) => (
-                  <SelectItem key={m.profile_id} value={m.profile_id}>
-                    {m.profile?.full_name ?? m.profile?.email ?? "Unknown"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+            {/* Assign */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2" align="start">
+                <div className="space-y-1">
+                  <button className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent" onClick={() => applyUpdate({ assignee_id: null })}>Unassigned</button>
+                  {uniqueMembers.map((m) => (
+                    <button key={m.profile_id} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent truncate" onClick={() => applyUpdate({ assignee_id: m.profile_id })}>
+                      {m.profile?.full_name ?? "Unknown"}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
 
-          {activeAction === "dueDate" && (
-            <BaseInput
-              type="date"
-              value={selectedDate}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSelectedDate(e.target.value)}
-              className="h-8 w-[160px] text-sm"
-            />
-          )}
+            {/* Due Date */}
+            {canEditDueDate && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 text-xs">
+                    <Calendar className="h-3.5 w-3.5 mr-1" /> Due Date
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="start">
+                  <BaseInput
+                    type="date"
+                    className="h-8 text-xs"
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      if (e.target.value) applyUpdate({ due_date: e.target.value });
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
 
-          {activeAction === "priority" && (
-            <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-              <SelectTrigger className="w-[130px] h-8 text-sm">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+            {/* Priority */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <ArrowUpDown className="h-3.5 w-3.5 mr-1" /> Priority
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-36 p-2" align="start">
+                <div className="space-y-1">
+                  {[["low", "Low"], ["medium", "Medium"], ["high", "High"]].map(([val, label]) => (
+                    <button key={val} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent" onClick={() => applyUpdate({ priority: val })}>{label}</button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
 
-          {activeAction && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleApply}
-              disabled={bulkUpdate.isPending}
-              className="h-8 font-semibold"
-            >
-              Apply ({selectedIds.size})
-            </Button>
-          )}
-        </>
-      )}
-    </div>
+            {/* Status */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <Activity className="h-3.5 w-3.5 mr-1" /> Status
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-2" align="start">
+                <div className="space-y-1">
+                  {[["backlog", "Backlog"], ["in_progress", "In Progress"], ["review", "Review"], ["done", "Done"], ["live", "Live"], ["cancelled", "Cancelled"]].map(([val, label]) => (
+                    <button key={val} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent" onClick={() => applyUpdate({ status: val })}>{label}</button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Vertical */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  <Layers className="h-3.5 w-3.5 mr-1" /> Vertical
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-2" align="start">
+                <div className="space-y-1">
+                  {[["business", "Business"], ["marketing", "Marketing"], ["development", "Development"], ["product", "Product"]].map(([val, label]) => (
+                    <button key={val} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-accent" onClick={() => applyUpdate({ pillar: val })}>{label}</button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Delete */}
+            {canDelete && (
+              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteDialogOpen(true)}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+
+      <DeleteTaskDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        taskTitle={`${selectedIds.size} selected task${selectedIds.size !== 1 ? "s" : ""}`}
+        taskStatus=""
+        subtaskCount={0}
+        isPending={deleteTask.isPending}
+        onConfirm={handleBulkDelete}
+      />
+    </>
   );
 }

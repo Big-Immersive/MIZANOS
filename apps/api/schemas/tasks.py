@@ -116,6 +116,8 @@ class TaskBulkUpdateRequest(BaseSchema):
     assignee_id: UUID | None = None
     due_date: datetime | None = None
     priority: str | None = None
+    status: str | None = None
+    pillar: str | None = None
 
 
 class TaskBulkUpdateResponse(BaseSchema):

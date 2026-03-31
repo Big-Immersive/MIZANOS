@@ -30,6 +30,7 @@ const taskSchema = z.object({
   description: z.string().optional(),
   pillar: z.enum(["business", "marketing", "development", "product"]),
   priority: z.enum(["low", "medium", "high", "critical", "production_bug"]),
+  status: z.enum(["backlog", "in_progress", "review", "done", "live", "cancelled"]),
   due_date: z.string().optional(),
   created_at: z.string().optional(),
   assignee_id: z.string().optional(),
@@ -52,6 +53,15 @@ const PRIORITY_OPTIONS = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "backlog", label: "Backlog" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "review", label: "Review" },
+  { value: "done", label: "Done" },
+  { value: "live", label: "Live" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -102,6 +112,7 @@ export function AddTaskDialog({
     description: "",
     pillar: "development",
     priority: "medium",
+    status: defaultStatus,
     due_date: "",
     created_at: "",
     assignee_id: "",
@@ -130,7 +141,7 @@ export function AddTaskDialog({
   const onFormSubmit = (values: TaskFormValues) => {
     onSubmit({
       ...values,
-      status: defaultStatus,
+      status: values.status || defaultStatus,
       assignee_id:
         !values.assignee_id || values.assignee_id === "__none__" ? undefined : values.assignee_id,
       due_date: values.due_date || new Date().toISOString().split("T")[0],
@@ -140,6 +151,7 @@ export function AddTaskDialog({
 
   const currentPillar = watch("pillar");
   const currentPriority = watch("priority");
+  const currentStatus = watch("status");
   const currentAssignee = watch("assignee_id");
 
   return (
@@ -198,8 +210,8 @@ export function AddTaskDialog({
             </div>
           )}
 
-          {/* Vertical + Priority row */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Vertical + Priority + Status row */}
+          <div className="grid grid-cols-3 gap-4">
             <SelectField
               label="Business Vertical"
               placeholder="Select vertical"
@@ -216,6 +228,15 @@ export function AddTaskDialog({
               value={currentPriority}
               onValueChange={(v) =>
                 setValue("priority", v as TaskPriority)
+              }
+            />
+            <SelectField
+              label="Status"
+              placeholder="Select status"
+              options={STATUS_OPTIONS}
+              value={currentStatus}
+              onValueChange={(v) =>
+                setValue("status", v as TaskStatus)
               }
             />
           </div>
