@@ -15,6 +15,10 @@ export class AuditRepository extends BaseRepository<Audit> {
     return response.data;
   }
 
+  async deleteAudit(auditId: string): Promise<void> {
+    await this.client.delete(`${this.basePath}/${auditId}`);
+  }
+
   async getLatest(productId: string): Promise<Audit | null> {
     const result = await this.getAll({
       product_id: productId,

@@ -1,5 +1,6 @@
 """Audit service."""
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -37,64 +38,107 @@ class AuditService(BaseService[Audit]):
         }
 
     async def run_audit(self, product_id: UUID, user_id: str) -> Audit:
-        """Run audit combining QA checks and optional repo evaluation."""
+        """Run audit using scan data, GitHub analysis, and task metrics."""
+        from apps.api.models.audit import RepositoryAnalysis
         from apps.api.models.product import Product
-        from apps.api.models.qa import QACheck
+        from apps.api.models.task import Task
 
-        # 1. QA-based scoring
-        qa_stmt = select(QACheck).where(QACheck.product_id == product_id)
-        qa_result = await self.repo.session.execute(qa_stmt)
-        qa_checks = list(qa_result.scalars().all())
-
-        categories: dict[str, float] = {}
         issues: dict[str, list] = {"critical": [], "warnings": []}
 
-        if qa_checks:
-            cat_groups: dict[str, list[QACheck]] = {}
-            for check in qa_checks:
-                cat = check.category or "general"
-                if cat not in cat_groups:
-                    cat_groups[cat] = []
-                cat_groups[cat].append(check)
-
-            for cat, checks in cat_groups.items():
-                passed = sum(1 for c in checks if c.status == "passed")
-                total = len(checks)
-                score = round((passed / total) * 100, 1) if total > 0 else 0
-                categories[cat] = score
-
-                for c in checks:
-                    if c.status == "failed":
-                        issues["critical"].append({
-                            "check_id": str(c.id),
-                            "title": c.title,
-                            "category": cat,
-                        })
-                    elif c.status == "warning":
-                        issues["warnings"].append({
-                            "check_id": str(c.id),
-                            "title": c.title,
-                            "category": cat,
-                        })
-
-        # 2. Repo evaluation (if repo linked)
-        product = await self.repo.session.get(Product, product_id)
-        if product and product.repository_url:
-            repo_scores = await self._run_repo_evaluation(
-                product.repository_url
-            )
-            if repo_scores:
-                categories.update(repo_scores.get("categories", {}))
-                issues.setdefault("code_violations", []).extend(
-                    repo_scores.get("violations", [])
-                )
-
-        # 3. Compute overall score
-        overall_score = (
-            round(sum(categories.values()) / len(categories), 1)
-            if categories
-            else 0
+        # Fetch latest scan result
+        scan_stmt = (
+            select(RepositoryAnalysis)
+            .where(RepositoryAnalysis.product_id == product_id)
+            .order_by(RepositoryAnalysis.created_at.desc())
+            .limit(1)
         )
+        scan = (await self.repo.session.execute(scan_stmt)).scalar_one_or_none()
+
+        # Fetch tasks for the product
+        task_stmt = select(Task).where(Task.product_id == product_id)
+        tasks = list((await self.repo.session.execute(task_stmt)).scalars().all())
+        total_tasks = len(tasks)
+
+        # Fetch product for repo info
+        product = await self.repo.session.get(Product, product_id)
+
+        # --- Style score: code organization & structure ---
+        style = 0.0
+        if scan:
+            evidence = scan.functional_inventory or []
+            if isinstance(evidence, list) and evidence:
+                # Avg confidence of task-code matching (higher = better organized code)
+                confidences = [e.get("confidence", 0) for e in evidence if isinstance(e, dict)]
+                style = round((sum(confidences) / len(confidences)) * 100, 1) if confidences else 0
+            tech = scan.tech_stack if isinstance(scan.tech_stack, dict) else {}
+            if tech.get("description"):
+                style = min(100, style + 10)
+
+        # --- Architecture score: task coverage & component structure ---
+        architecture = 0.0
+        if scan and scan.gap_analysis and isinstance(scan.gap_analysis, dict):
+            ga = scan.gap_analysis
+            total = ga.get("total_tasks", 0)
+            verified = ga.get("verified", 0)
+            partial = ga.get("partial", 0)
+            no_evidence = ga.get("no_evidence", 0)
+            if total > 0:
+                architecture = round(((verified + partial * 0.5) / total) * 100, 1)
+            if no_evidence > 3:
+                issues["warnings"].append({
+                    "title": f"{no_evidence} tasks have no matching code",
+                    "category": "architecture",
+                })
+
+        # --- Security score: based on task completion & overdue ---
+        security = 0.0
+        if total_tasks > 0:
+            done = sum(1 for t in tasks if t.status in ("done", "live"))
+            now = datetime.now(timezone.utc)
+            overdue = sum(
+                1 for t in tasks
+                if t.due_date and t.due_date < now and t.status not in ("done", "live")
+            )
+            completion_ratio = done / total_tasks
+            security = round(completion_ratio * 100, 1)
+            if overdue > 0:
+                penalty = min(30, overdue * 10)
+                security = max(0, security - penalty)
+                issues["critical"].append({
+                    "title": f"{overdue} overdue task(s) still open",
+                    "category": "security",
+                })
+
+        # --- Performance score: scan freshness & repo health ---
+        performance = 0.0
+        checks_passed = 0
+        total_checks = 5
+        if scan:
+            checks_passed += 1  # Has scan data
+            if scan.file_count and scan.file_count > 10:
+                checks_passed += 1
+            fi = scan.functional_inventory
+            if isinstance(fi, list) and len(fi) > 0:
+                with_artifacts = sum(
+                    1 for e in fi
+                    if isinstance(e, dict) and e.get("artifacts_found")
+                )
+                if with_artifacts > len(fi) * 0.5:
+                    checks_passed += 1
+        if product and product.repository_url:
+            checks_passed += 1
+        if total_tasks > 0 and sum(1 for t in tasks if t.status in ("done", "live")) > 0:
+            checks_passed += 1
+        performance = round((checks_passed / total_checks) * 100, 1)
+
+        categories = {
+            "style": style,
+            "architecture": architecture,
+            "security": security,
+            "performance": performance,
+        }
+
+        overall_score = round(sum(categories.values()) / len(categories), 1)
 
         audit = Audit(
             product_id=product_id,
@@ -105,11 +149,15 @@ class AuditService(BaseService[Audit]):
         )
         return await self.repo.create(audit)
 
-    async def _run_repo_evaluation(
-        self, repository_url: str
-    ) -> dict | None:
-        """Repo evaluation removed — always returns None."""
-        return None
+    async def delete_audit(self, audit_id: UUID) -> None:
+        """Delete a single audit record."""
+        from packages.common.utils.error_handlers import not_found
+
+        audit = await self.repo.session.get(Audit, audit_id)
+        if not audit:
+            raise not_found("Audit")
+        await self.repo.session.delete(audit)
+        await self.repo.session.flush()
 
     async def compare(self, product_id: UUID) -> dict:
         """Compare the latest two audits for a product."""

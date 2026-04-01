@@ -19,7 +19,8 @@ import {
   Loader2,
   Play,
 } from "lucide-react";
-import { useRunAudit } from "@/hooks/mutations/useAuditMutations";
+import { useRunAudit, useDeleteAudit } from "@/hooks/mutations/useAuditMutations";
+import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 
 interface AuditHistoryListProps {
   productId: string;
@@ -132,6 +133,10 @@ type SeverityFilter = "all" | "critical" | "warning" | "info";
 function AuditHistoryList({ productId }: AuditHistoryListProps) {
   const { data: audits, isLoading } = useAuditHistory(productId);
   const runAudit = useRunAudit(productId);
+  const deleteAudit = useDeleteAudit(productId);
+  const { isEngineer, isAdmin, isProjectManager } = useRoleVisibility();
+  const isAIEngineerOnly = isEngineer && !isAdmin && !isProjectManager;
+  const canDelete = !isAIEngineerOnly;
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
 
   const filteredAudits = useMemo(() => {
@@ -228,6 +233,9 @@ function AuditHistoryList({ productId }: AuditHistoryListProps) {
             key={audit.id}
             audit={audit}
             isLatest={index === 0}
+            canDelete={canDelete}
+            onDelete={(id) => deleteAudit.mutate(id)}
+            isDeleting={deleteAudit.isPending}
           />
         ))}
       </div>

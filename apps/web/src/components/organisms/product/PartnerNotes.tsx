@@ -67,7 +67,7 @@ function PartnerNotes({ productId, authorId }: PartnerNotesProps) {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Handshake className="h-4 w-4" />
-            Partner Notes ({notes.length})
+            Release Notes ({notes.length})
           </CardTitle>
           <Button
             variant="outline"
@@ -81,7 +81,7 @@ function PartnerNotes({ productId, authorId }: PartnerNotesProps) {
         <CardContent>
           {notes.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No partner notes yet. These are visible to external partners.
+              No release notes yet. These are visible to external partners.
             </p>
           ) : (
             <div className="space-y-3">

@@ -17,11 +17,15 @@ import {
   FolderTree,
   Shield,
   Gauge,
+  Trash2,
 } from "lucide-react";
 
 interface AuditHistoryItemProps {
   audit: Audit;
   isLatest?: boolean;
+  canDelete?: boolean;
+  onDelete?: (auditId: string) => void;
+  isDeleting?: boolean;
 }
 
 interface AuditCategories {
@@ -68,7 +72,7 @@ function parseIssues(issues: JsonValue): AuditIssue[] {
   return [];
 }
 
-function AuditHistoryItem({ audit, isLatest }: AuditHistoryItemProps) {
+function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: AuditHistoryItemProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const categories = parseCategories(audit.categories);
@@ -116,6 +120,17 @@ function AuditHistoryItem({ audit, isLatest }: AuditHistoryItemProps) {
                   </span>
                 )}
               </div>
+              {canDelete && onDelete && (
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={(e) => { e.stopPropagation(); onDelete(audit.id); }}
+                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                  title="Delete audit"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
               {isOpen ? (
                 <ChevronUp className="h-4 w-4" />
               ) : (

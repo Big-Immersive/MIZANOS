@@ -31,6 +31,11 @@ async def run_audit(body: RunAuditRequest, user: CurrentUser = None, service: Au
     return await service.run_audit(body.product_id, user.profile_id)
 
 
+@router.delete("/{audit_id}", status_code=204)
+async def delete_audit(audit_id: UUID, user: CurrentUser = None, service: AuditService = Depends(get_service)):
+    await service.delete_audit(audit_id)
+
+
 @router.get("/compare", response_model=CompareResponse)
 async def compare_audits(product_id: UUID, user: CurrentUser = None, service: AuditService = Depends(get_service)):
     return await service.compare(product_id)
