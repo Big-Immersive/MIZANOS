@@ -11,7 +11,7 @@ class AuditResponse(BaseSchema):
 
     id: UUID
     product_id: UUID
-    overall_score: int
+    overall_score: float
     categories: dict
     issues: dict
     created_by: UUID | None = None
