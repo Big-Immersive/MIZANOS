@@ -60,7 +60,7 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
           setToken(storedToken);
           setUser(userData);
           localStorage.setItem("access_token", storedToken);
-          document.cookie = `access_token=${storedToken}; path=/; max-age=86400; SameSite=Lax`;
+          document.cookie = `access_token=${storedToken}; path=/; max-age=604800; SameSite=Lax`;
         })
         .catch(() => {
           localStorage.removeItem(TOKEN_KEY);
@@ -86,7 +86,7 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
       localStorage.setItem("refresh_token", data.refresh_token);
     }
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-    document.cookie = `access_token=${data.access_token}; path=/; max-age=86400; SameSite=Lax`;
+    document.cookie = `access_token=${data.access_token}; path=/; max-age=604800; SameSite=Lax`;
     setToken(data.access_token);
     setUser(data.user);
   };

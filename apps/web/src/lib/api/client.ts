@@ -32,7 +32,11 @@ function getRefreshToken(): string | null {
 
 function setTokens(access: string, refresh: string): void {
   localStorage.setItem("access_token", access);
+  localStorage.setItem("mizan_auth_token", access);
   localStorage.setItem("refresh_token", refresh);
+  if (typeof document !== "undefined") {
+    document.cookie = `access_token=${access}; path=/; max-age=604800; SameSite=Lax`;
+  }
 }
 
 export function clearTokens(): void {
