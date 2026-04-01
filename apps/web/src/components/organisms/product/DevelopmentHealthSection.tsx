@@ -97,17 +97,18 @@ function computeCodeQuality(scanResult: { functional_inventory?: Array<{ confide
   return Math.round((avgConfidence * 60 + artifactCoverage * 40));
 }
 
-function computeStandards(scanResult: { gap_analysis?: { total_tasks?: number; verified?: number; partial?: number; no_evidence?: number } | null; file_count?: number | null } | null | undefined, analysis: { tech_stack?: Record<string, unknown> | null } | null | undefined): number {
+function computeStandards(scanResult: { gap_analysis?: { total_tasks?: number; verified?: number; partial?: number; no_evidence?: number } | null; file_count?: number | null } | null | undefined, analysis: { tech_stack?: unknown } | null | undefined): number {
+  const techStack = (typeof analysis?.tech_stack === "object" && analysis.tech_stack !== null ? analysis.tech_stack : {}) as Record<string, unknown>;
   let score = 0;
   let checks = 0;
 
   // Check 1: Has repo description (from GitHub analysis)
   checks++;
-  if (analysis?.tech_stack?.description) score++;
+  if (techStack.description) score++;
 
   // Check 2: Has multiple contributors
   checks++;
-  const contributors = Number(analysis?.tech_stack?.contributors ?? 0);
+  const contributors = Number(techStack.contributors ?? 0);
   if (contributors > 1) score++;
 
   // Check 3: Reasonable file count (project has substance)
