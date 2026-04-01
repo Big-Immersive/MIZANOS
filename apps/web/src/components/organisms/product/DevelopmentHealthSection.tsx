@@ -292,6 +292,7 @@ export function DevelopmentHealthSection({
             score={codeQuality}
             label={hasScanData ? "evidence quality" : "audit score"}
             techTags={[...(fw.styling ?? []), ...(fw.database ?? [])]}
+          />
         </div>
       </CardContent>
     </Card>
