@@ -190,7 +190,7 @@ export function FloatingAIButton({
             <AIChatPanel
               isOpen={isOpen}
               onClose={handleMinimize}
-              productId={productId}
+              productId={productId ?? null}
               productName={productName}
               embedded
             />
