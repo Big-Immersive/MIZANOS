@@ -13,7 +13,7 @@ import { AIChatPanel } from "./AIChatPanel";
 // ---------------------------------------------------------------------------
 
 interface FloatingAIButtonProps {
-  productId: string | null;
+  productId?: string | null;
   productName?: string;
 }
 
