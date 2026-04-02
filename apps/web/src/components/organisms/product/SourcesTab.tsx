@@ -11,7 +11,10 @@ import {
   Plus,
   RefreshCw,
   Loader2,
+  Sparkles,
 } from "lucide-react";
+import { specificationsRepository } from "@/lib/api/repositories";
+import { toast } from "sonner";
 import { useProductDetail } from "@/hooks/queries/useProductDetail";
 import { useSpecificationSources } from "@/hooks/queries/useSpecificationSources";
 import { useRegenerateSpecification } from "@/hooks/mutations/useSpecificationMutations";
@@ -25,6 +28,7 @@ export interface SourcesTabProps {
 
 export function SourcesTab({ productId }: SourcesTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const { data, isLoading: productLoading } = useProductDetail(productId);
   const { data: specSources, isLoading: sourcesLoading } = useSpecificationSources(productId);
   const regenerate = useRegenerateSpecification(productId);
@@ -66,6 +70,27 @@ export function SourcesTab({ productId }: SourcesTabProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setEnriching(true);
+              try {
+                const result = await specificationsRepository.enrichAllSources(productId);
+                toast.success(result.message);
+                if (result.enriched > 0) window.location.reload();
+              } catch { toast.error("Enrichment failed"); }
+              finally { setEnriching(false); }
+            }}
+            disabled={enriching}
+          >
+            {enriching ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-1" />
+            )}
+            Enrich All
+          </Button>
           <Button
             variant="outline"
             size="sm"

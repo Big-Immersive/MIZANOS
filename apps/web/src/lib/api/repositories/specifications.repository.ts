@@ -104,6 +104,15 @@ export class SpecificationsRepository extends BaseRepository<Specification> {
     return response.data.download_url;
   }
 
+  async enrichAllSources(productId: string): Promise<{ enriched: number; total: number; message: string }> {
+    const response = await this.client.post<{ enriched: number; total: number; message: string }>(
+      `/products/${productId}/specification-sources/enrich-all`,
+      {},
+      { timeout: 300_000 },
+    );
+    return response.data;
+  }
+
   async enrichSource(sourceId: string): Promise<{ ai_summary: unknown; message: string }> {
     const response = await this.client.post<{ ai_summary: unknown; message: string }>(
       `/products/specification-sources/${sourceId}/enrich`,
