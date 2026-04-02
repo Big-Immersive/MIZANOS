@@ -18,7 +18,7 @@ import { useCreateBug } from "@/hooks/mutations/useBugMutations";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
 import { BUG_STATUS_DISPLAY, BUG_STATUSES, TASK_PRIORITY_COLORS } from "@/lib/constants";
 import type { Task, KanbanTask } from "@/lib/types";
-import { Bug as BugIcon, ListTodo, Plus } from "lucide-react";
+import { Bug as BugIcon, FolderKanban, ListTodo, Plus } from "lucide-react";
 import { Button } from "@/components/molecules/buttons/Button";
 import { SelectField } from "@/components/molecules/forms/SelectField";
 
@@ -87,6 +87,23 @@ export default function BugsPage() {
     return counts;
   }, [bugs]);
 
+  const groupedBugs = useMemo(() => {
+    if (!bugs) return [];
+    const groups = new Map<string, Task[]>();
+    for (const bug of bugs) {
+      const pid = bug.product_id ?? "unknown";
+      if (!groups.has(pid)) groups.set(pid, []);
+      groups.get(pid)!.push(bug);
+    }
+    return Array.from(groups.entries())
+      .map(([productId, projectBugs]) => ({
+        productId,
+        productName: productMap.get(productId) ?? "Unknown Project",
+        bugs: projectBugs,
+      }))
+      .sort((a, b) => a.productName.localeCompare(b.productName));
+  }, [bugs, productMap]);
+
   const hasActiveFilters = search !== "" || projectFilter !== "all" || assigneeFilter !== "all" || pmFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all";
 
   const clearFilters = () => {
@@ -138,15 +155,25 @@ export default function BugsPage() {
       {isLoading && <BugsSkeleton />}
 
       {!isLoading && bugs && bugs.length > 0 && (
-        <div className="space-y-2">
-          {bugs.map((bug) => (
-            <BugRow
-              key={bug.id}
-              bug={bug}
-              projectName={productMap.get(bug.product_id)}
-              assigneeName={bug.assignee_id ? profileMap.get(bug.assignee_id) : undefined}
-              onClick={() => { setEditBug(toKanbanTask(bug, profileMap)); setEditDialogOpen(true); }}
-            />
+        <div className="space-y-6">
+          {groupedBugs.map((group) => (
+            <div key={group.productId}>
+              <div className="flex items-center gap-2 mb-2 sticky top-0 bg-background/95 backdrop-blur-sm z-10 py-1.5">
+                <FolderKanban className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">{group.productName}</h3>
+                <Badge variant="secondary" className="text-[10px]">{group.bugs.length}</Badge>
+              </div>
+              <div className="space-y-1.5 pl-1">
+                {group.bugs.map((bug) => (
+                  <BugRow
+                    key={bug.id}
+                    bug={bug}
+                    assigneeName={bug.assignee_id ? profileMap.get(bug.assignee_id) : undefined}
+                    onClick={() => { setEditBug(toKanbanTask(bug, profileMap)); setEditDialogOpen(true); }}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -193,7 +220,7 @@ export default function BugsPage() {
   );
 }
 
-function BugRow({ bug, projectName, assigneeName, onClick }: { bug: Task; projectName?: string; assigneeName?: string; onClick: () => void }) {
+function BugRow({ bug, assigneeName, onClick }: { bug: Task; assigneeName?: string; onClick: () => void }) {
   const config = BUG_STATUS_DISPLAY[bug.status ?? "reported"] ?? BUG_STATUS_DISPLAY.reported;
   const Icon = config.icon;
 
@@ -204,8 +231,7 @@ function BugRow({ bug, projectName, assigneeName, onClick }: { bug: Task; projec
         <p className="text-sm font-medium truncate">{bug.title}</p>
         {bug.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{bug.description}</p>}
       </div>
-      {projectName && <span className="text-xs text-muted-foreground truncate max-w-[120px] shrink-0">{projectName}</span>}
-      {assigneeName && <span className="text-xs text-muted-foreground truncate max-w-[100px] shrink-0">{assigneeName}</span>}
+      {assigneeName && <span className="text-xs text-muted-foreground truncate max-w-[120px] shrink-0">{assigneeName}</span>}
       {bug.priority && (
         <Badge variant="secondary" className={`text-[10px] shrink-0 capitalize ${TASK_PRIORITY_COLORS[bug.priority] ?? ""}`}>{bug.priority}</Badge>
       )}

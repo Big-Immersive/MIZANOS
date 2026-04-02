@@ -22,11 +22,12 @@ import { EnvironmentsTab } from "@/components/organisms/product/EnvironmentsTab"
 import { MarketingTab } from "@/components/organisms/marketing/MarketingTab";
 import { SourcesTab } from "@/components/organisms/product/SourcesTab";
 import { BugsTab } from "@/components/organisms/product/BugsTab";
+import { QAChecklistTab } from "@/components/organisms/product/QAChecklistTab";
 import { ProductSettingsDialog } from "@/components/organisms/product/ProductSettingsDialog";
 import { LinkGitHubDialog } from "@/components/organisms/product/LinkGitHubDialog";
 import { GitHubLinkBanner } from "@/components/molecules/github/GitHubLinkBanner";
 import { FloatingAIButton } from "@/components/organisms/ai/FloatingAIButton";
-import { Dialog, DialogContent } from "@/components/atoms/layout/Dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/atoms/layout/Dialog";
 import { Button } from "@/components/molecules/buttons/Button";
 import { useProductDetail } from "@/hooks/queries/useProductDetail";
 import { useUpdateProduct } from "@/hooks/mutations/useProductMutations";
@@ -90,6 +91,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       <DocumentsList productId={id} onUploadClick={() => setDocUploadOpen(true)} />
       <Dialog open={docUploadOpen} onOpenChange={setDocUploadOpen}>
         <DialogContent className="max-w-lg">
+          <DialogTitle className="sr-only">Upload Document</DialogTitle>
           <DocumentUpload productId={id} onComplete={() => setDocUploadOpen(false)} />
         </DialogContent>
       </Dialog>
@@ -160,6 +162,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         }
         environmentsContent={<EnvironmentsTab productId={id} />}
         marketingContent={<MarketingTab productId={id} />}
+        qaContent={<QAChecklistTab productId={id} />}
         sourcesContent={<SourcesTab productId={id} />}
       />
       <LinkGitHubDialog

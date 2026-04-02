@@ -13,6 +13,7 @@ import { DomainsSection } from "./DomainsSection";
 import { SocialHandlesSection } from "./SocialHandlesSection";
 import { CredentialsSection } from "./CredentialsSection";
 import { ChecklistSection } from "./ChecklistSection";
+import { ProjectChecklistView } from "@/components/organisms/product/ProjectChecklistView";
 import { MarketingTasksSection } from "./MarketingTasksSection";
 
 interface MarketingTabProps {
@@ -25,7 +26,7 @@ const TABS = [
   { id: "domains", label: "Domains", icon: Globe },
   { id: "social", label: "Social Handles", icon: Share2 },
   { id: "credentials", label: "Credentials", icon: Key },
-  { id: "checklist", label: "Checklist", icon: CheckSquare },
+  { id: "checklist", label: "Checklist for GTM", icon: CheckSquare },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -85,7 +86,12 @@ export function MarketingTab({ productId, canViewCredentials = false }: Marketin
             <CredentialsSection credentials={credentials ?? []} productId={productId} />
           )}
           {activeTab === "checklist" && (
-            <ChecklistSection items={checklistItems ?? []} productId={productId} />
+            <>
+              <ChecklistSection items={checklistItems ?? []} productId={productId} />
+              <div className="mt-6">
+                <ProjectChecklistView productId={productId} checklistType="gtm" title="GTM Checklists" />
+              </div>
+            </>
           )}
         </div>
       )}

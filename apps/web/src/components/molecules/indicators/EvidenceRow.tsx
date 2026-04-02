@@ -41,7 +41,7 @@ function EvidenceRow({ evidence }: { evidence: TaskEvidence }) {
           ) : (
             <XCircle className="h-4 w-4 text-muted-foreground/50 shrink-0" />
           )}
-          <span className="flex-1 text-sm truncate">{evidence.task_title}</span>
+          <span className="flex-1 text-sm truncate">{evidence.task_title || "Untitled Task"}</span>
           <Badge variant="outline" className="text-[10px] shrink-0">
             {evidence.status_in_pm}
           </Badge>

@@ -20,7 +20,7 @@ class DocumentCreate(DocumentBase):
     """Document creation schema."""
 
     product_id: UUID
-    uploaded_by: UUID
+    uploaded_by: UUID | None = None
     folder_id: UUID | None = None
 
 

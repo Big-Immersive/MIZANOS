@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LayoutTemplate, Plus } from "lucide-react";
+import { LayoutTemplate, ListChecks, Plus } from "lucide-react";
+import { ChecklistTemplateSection } from "@/components/organisms/templates/ChecklistTemplateSection";
 import { BaseButton } from "@/components/atoms/buttons/BaseButton";
 import { PageHeader } from "@/components/molecules/layout/PageHeader";
 import { TemplateGroupList } from "@/components/organisms/templates/TemplateGroupList";
@@ -27,6 +28,7 @@ const SOURCE_TABS: { id: string; label: string }[] = [
 ];
 
 export default function TemplatesPage() {
+  const [section, setSection] = useState<"task" | "checklist">("task");
   const [activeTab, setActiveTab] = useState("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<TaskTemplateGroup | null>(null);
@@ -73,15 +75,37 @@ export default function TemplatesPage() {
   return (
     <div className="p-6 space-y-6">
       <PageHeader
-        title="Workflow Templates"
-        subtitle="Multi-step workflow templates for each project source type"
+        title="Templates"
+        subtitle="Manage workflow and checklist templates"
         icon={<LayoutTemplate className="h-5 w-5 text-primary" />}
-      >
+      />
+
+      <div className="flex items-center gap-1 rounded-lg border p-1 w-fit">
+        <button
+          onClick={() => setSection("task")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${section === "task" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <LayoutTemplate className="h-4 w-4" /> Task Templates
+        </button>
+        <button
+          onClick={() => setSection("checklist")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${section === "checklist" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <ListChecks className="h-4 w-4" /> Checklist Templates
+        </button>
+      </div>
+
+      {section === "checklist" ? (
+        <ChecklistTemplateSection />
+      ) : (
+      <>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Task Templates</h2>
         <BaseButton onClick={handleAdd} size="sm">
           <Plus className="h-4 w-4 mr-1.5" />
           Add Template
         </BaseButton>
-      </PageHeader>
+      </div>
 
       <div className="flex gap-1 border-b overflow-x-auto">
         {SOURCE_TABS.map((tab) => (
@@ -121,6 +145,8 @@ export default function TemplatesPage() {
         onConfirm={handleDeleteConfirm}
         isDeleting={deleteGroup.isPending}
       />
+      </>
+      )}
     </div>
   );
 }

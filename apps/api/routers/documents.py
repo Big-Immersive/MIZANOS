@@ -39,6 +39,8 @@ async def list_documents(
 
 @router.post("", response_model=DocumentResponse, status_code=201)
 async def create_document(body: DocumentCreate, user: CurrentUser = None, service: DocumentService = Depends(get_service)):
+    if not body.uploaded_by and user and user.profile_id:
+        body.uploaded_by = user.profile_id
     return await service.create_document(body)
 
 

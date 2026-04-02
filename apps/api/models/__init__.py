@@ -47,6 +47,13 @@ from .settings import (
 )
 from .specification import Specification, SpecificationFeature, SpecificationSource
 from .task import Task, TaskTemplate, TaskTemplateGroup
+from .checklist_template import (
+    ChecklistCategory,
+    ChecklistTemplate,
+    ChecklistTemplateItem,
+    ProjectChecklist,
+    ProjectChecklistItem,
+)
 from .task_checklist import TaskChecklistItem
 from .task_comment import TaskComment
 from .user import (
@@ -122,6 +129,12 @@ __all__ = [
     "Specification",
     "SpecificationFeature",
     "SpecificationSource",
+    # Checklist Templates
+    "ChecklistTemplate",
+    "ChecklistTemplateItem",
+    "ProjectChecklist",
+    "ProjectChecklistItem",
+    "ChecklistCategory",
     # Task
     "Task",
     "TaskChecklistItem",

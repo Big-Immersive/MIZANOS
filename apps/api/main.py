@@ -52,6 +52,8 @@ from apps.api.routers import (
     specification_sources,
     task_checklist,
     task_comments,
+    checklist_templates,
+    project_checklists,
 )
 
 
@@ -150,6 +152,8 @@ app.include_router(product_notification_settings.router, prefix="/products", tag
 app.include_router(specification_sources.router, prefix="/products", tags=["specification-sources"])
 app.include_router(utilities.router, prefix="/utilities", tags=["utilities"])
 app.include_router(scans.router, prefix="/scans", tags=["scans"])
+app.include_router(checklist_templates.router, prefix="/checklist-templates", tags=["checklist-templates"])
+app.include_router(project_checklists.router, prefix="/project-checklists", tags=["project-checklists"])
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
 

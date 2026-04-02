@@ -16,6 +16,7 @@ import {
   History,
   Rocket,
   Server,
+  ShieldCheck,
   Megaphone,
   FolderGit2,
   Users,
@@ -41,6 +42,7 @@ interface ProductTabsProps {
   documentsContent?: ReactNode;
   auditContent?: ReactNode;
   deploymentContent?: ReactNode;
+  qaContent?: ReactNode;
   environmentsContent?: ReactNode;
   marketingContent?: ReactNode;
   sourcesContent?: ReactNode;
@@ -61,6 +63,7 @@ function ProductTabs({
   documentsContent,
   auditContent,
   deploymentContent,
+  qaContent,
   environmentsContent,
   marketingContent,
   sourcesContent,
@@ -116,6 +119,12 @@ function ProductTabs({
       label: "Marketing",
       icon: <Megaphone className="h-4 w-4" />,
       content: marketingContent,
+    },
+    {
+      value: "qa",
+      label: "QA",
+      icon: <ShieldCheck className="h-4 w-4" />,
+      content: qaContent,
     },
     {
       value: "audit",

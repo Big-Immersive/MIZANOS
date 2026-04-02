@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
 import { Button } from "@/components/molecules/buttons/Button";
@@ -52,6 +53,7 @@ function DocumentUpload({
   const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [defaultCategory, setDefaultCategory] = useState<string>("general");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
   const uploadMutation = useUploadDocument(productId);
 
   const handleFileSelect = useCallback(
@@ -147,7 +149,7 @@ function DocumentUpload({
           category: item.category,
           description: item.description || null,
           folder_id: folderId ?? null,
-          uploaded_by: "",
+          uploaded_by: user?.profile_id ?? user?.id ?? "",
         });
 
         setQueue((prev) =>

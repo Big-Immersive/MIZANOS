@@ -51,7 +51,7 @@ class DocumentService(BaseService[ProductDocument]):
         }
 
     async def create_document(self, data: DocumentCreate) -> ProductDocument:
-        doc = ProductDocument(**data.model_dump())
+        doc = ProductDocument(**data.model_dump(exclude={"file_url"}))
         return await self.repo.create(doc)
 
     async def upload_document(
