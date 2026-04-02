@@ -54,8 +54,9 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
             if (line.endsWith("\r")) line = line.slice(0, -1);
             if (!line.startsWith("data: ")) continue;
 
-            const jsonStr = line.slice(6).trim();
-            if (jsonStr === "[DONE]") break;
+            const jsonStr = line.slice(6);
+            if (jsonStr.trim() === "[DONE]") break;
+            if (!jsonStr) continue;
 
             try {
               const parsed = JSON.parse(jsonStr);
