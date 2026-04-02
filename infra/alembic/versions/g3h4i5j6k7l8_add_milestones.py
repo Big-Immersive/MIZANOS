@@ -7,7 +7,7 @@ Create Date: 2026-04-02
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision: str = "g3h4i5j6k7l8"
 down_revision: str = "f2a3b4c5d6e7"
@@ -26,6 +26,7 @@ def upgrade() -> None:
         sa.Column("priority", sa.String, nullable=True, server_default="medium"),
         sa.Column("pillar", sa.String, nullable=True, server_default="development"),
         sa.Column("assignee_id", UUID(as_uuid=True), sa.ForeignKey("profiles.id"), nullable=True),
+        sa.Column("assignee_ids", JSONB, server_default=sa.text("'[]'"), nullable=True),
         sa.Column("sort_order", sa.Integer, server_default=sa.text("0"), nullable=False),
         sa.Column("is_default", sa.Boolean, server_default=sa.text("false"), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
