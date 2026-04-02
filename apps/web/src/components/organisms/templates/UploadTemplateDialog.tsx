@@ -185,9 +185,25 @@ export function UploadTemplateDialog({ open, onOpenChange }: UploadTemplateDialo
                 </div>
               ))}
               {items.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No items extracted. Try a different file.
-                </p>
+                <div className="text-center py-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    No items were auto-extracted. You can still create the template and add items manually.
+                  </p>
+                  <div className="flex items-center gap-2 max-w-md mx-auto">
+                    <input
+                      type="text"
+                      placeholder="Add item manually..."
+                      className="flex-1 h-8 px-2 text-sm rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
+                          setItems((prev) => [...prev, { title: (e.target as HTMLInputElement).value.trim(), category: "general", default_status: "new" }]);
+                          (e.target as HTMLInputElement).value = "";
+                        }
+                      }}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Press Enter to add</p>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -197,7 +213,7 @@ export function UploadTemplateDialog({ open, onOpenChange }: UploadTemplateDialo
                 <Button variant="outline" onClick={handleClose}>Cancel</Button>
                 <Button
                   onClick={() => confirmMutation.mutate()}
-                  disabled={items.length === 0 || !templateName.trim() || confirmMutation.isPending}
+                  disabled={!templateName.trim() || confirmMutation.isPending}
                 >
                   {confirmMutation.isPending ? "Creating..." : `Create Template (${items.length} items)`}
                 </Button>

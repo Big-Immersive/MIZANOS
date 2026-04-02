@@ -48,6 +48,60 @@ async def create_template(
     return {**{c.key: getattr(t, c.key) for c in t.__table__.columns}, "item_count": 0, "items": []}
 
 
+# --- File Upload (must be before /{template_id}) ---
+
+@router.post("/upload/preview")
+async def preview_upload(
+    file: UploadFile = File(...),
+    user: CurrentUser = None,
+):
+    """Parse an uploaded file and return extracted items for preview."""
+    from apps.api.services.template_file_parser import parse_csv, parse_with_ai
+
+    content = await file.read()
+    filename = file.filename or "unknown"
+    lower = filename.lower()
+
+    if lower.endswith(".csv"):
+        result = await parse_csv(content)
+    else:
+        result = await parse_with_ai(content, filename)
+
+    return result
+
+
+@router.post("/upload/confirm", response_model=ChecklistTemplateDetailResponse)
+async def confirm_upload(
+    body: dict,
+    user: CurrentUser = None,
+    service: ChecklistTemplateService = Depends(get_service),
+):
+    """Create a template from previously parsed upload data."""
+    template_name = body.get("template_name", "Imported Template")
+    template_type = body.get("template_type", "general")
+    items = body.get("items", [])
+
+    t = await service.create_template(
+        {"name": template_name, "template_type": template_type},
+        created_by=user.profile_id if user else None,
+    )
+    for idx, item_data in enumerate(items):
+        await service.add_item(t.id, {
+            "title": item_data.get("title", ""),
+            "category": item_data.get("category", "general"),
+            "default_status": item_data.get("default_status", "new"),
+            "sort_order": idx,
+        })
+
+    await service.session.flush()
+    refreshed = await service.get_template(t.id)
+    return {
+        **{c.key: getattr(refreshed, c.key) for c in refreshed.__table__.columns},
+        "item_count": len(refreshed.items),
+        "items": refreshed.items,
+    }
+
+
 @router.get("/{template_id}", response_model=ChecklistTemplateDetailResponse)
 async def get_template(
     template_id: UUID,
@@ -150,60 +204,6 @@ async def apply_template(
         "item_count": len(cl.items),
         "completed_count": sum(1 for i in cl.items if i.status == "complete"),
         "items": items_resp,
-    }
-
-
-# --- File Upload ---
-
-@router.post("/upload/preview")
-async def preview_upload(
-    file: UploadFile = File(...),
-    user: CurrentUser = None,
-):
-    """Parse an uploaded file and return extracted items for preview (no DB changes)."""
-    from apps.api.services.template_file_parser import parse_csv, parse_with_ai
-
-    content = await file.read()
-    filename = file.filename or "unknown"
-    lower = filename.lower()
-
-    if lower.endswith(".csv"):
-        result = await parse_csv(content)
-    else:
-        result = await parse_with_ai(content, filename)
-
-    return result
-
-
-@router.post("/upload/confirm", response_model=ChecklistTemplateDetailResponse)
-async def confirm_upload(
-    body: dict,
-    user: CurrentUser = None,
-    service: ChecklistTemplateService = Depends(get_service),
-):
-    """Create a template from previously parsed upload data."""
-    template_name = body.get("template_name", "Imported Template")
-    template_type = body.get("template_type", "general")
-    items = body.get("items", [])
-
-    t = await service.create_template(
-        {"name": template_name, "template_type": template_type},
-        created_by=user.profile_id if user else None,
-    )
-    for idx, item_data in enumerate(items):
-        await service.add_item(t.id, {
-            "title": item_data.get("title", ""),
-            "category": item_data.get("category", "general"),
-            "default_status": item_data.get("default_status", "new"),
-            "sort_order": idx,
-        })
-
-    await service.session.flush()
-    refreshed = await service.get_template(t.id)
-    return {
-        **{c.key: getattr(refreshed, c.key) for c in refreshed.__table__.columns},
-        "item_count": len(refreshed.items),
-        "items": refreshed.items,
     }
 
 
