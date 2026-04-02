@@ -113,7 +113,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
             base_url=default_base_url,
             model=default_model,
             temperature=0.7,
-            max_tokens=4096,
+            max_tokens=512,
         )
 
     provider = org_cfg.get("provider", "")

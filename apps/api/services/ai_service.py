@@ -134,6 +134,7 @@ class AIService:
             response = await client.chat.completions.create(
                 model=config.model,
                 messages=messages,
+                max_tokens=config.max_tokens,
             )
             full_response = response.choices[0].message.content or ""
 
@@ -160,10 +161,43 @@ class AIService:
         await self.session.refresh(assistant_msg)
         return assistant_msg
 
+    async def _gather_all_projects_context(self) -> str:
+        """Gather summary of ALL projects for dashboard-level chat."""
+        from apps.api.models.product import Product
+        from apps.api.models.task import Task
+
+        products = list((await self.session.execute(select(Product))).scalars().all())
+        if not products:
+            return ""
+
+        lines = [f"ORGANIZATION OVERVIEW: {len(products)} projects"]
+        stages: dict[str, int] = {}
+        total_tasks = 0
+        total_done = 0
+
+        for p in products[:30]:
+            stages[p.stage or "Unknown"] = stages.get(p.stage or "Unknown", 0) + 1
+            task_stmt = select(Task).where(Task.product_id == p.id, Task.is_draft == False)
+            tasks = list((await self.session.execute(task_stmt)).scalars().all())
+            done = sum(1 for t in tasks if t.status in ("done", "live"))
+            total_tasks += len(tasks)
+            total_done += done
+            lines.append(f"  - {p.name} | Stage: {p.stage or 'N/A'} | Tasks: {done}/{len(tasks)}")
+
+        stage_str = ", ".join(f"{k}: {v}" for k, v in sorted(stages.items()))
+        summary = (
+            f"\n\n--- ALL PROJECTS CONTEXT ---\n"
+            f"{lines[0]}\nStages: {stage_str}\n"
+            f"Total tasks: {total_done}/{total_tasks} done\n\n"
+            + "\n".join(lines[1:])
+            + "\n--- END CONTEXT ---\n"
+        )
+        return summary
+
     async def _gather_project_context(self, product_id: UUID | None) -> str:
         """Gather project data to inject into AI system prompt."""
         if not product_id:
-            return ""
+            return await self._gather_all_projects_context()
 
         from apps.api.models.product import Product, ProductMember
         from apps.api.models.task import Task
@@ -307,6 +341,7 @@ class AIService:
             stream = await client.chat.completions.create(
                 model=config.model,
                 messages=messages,
+                max_tokens=config.max_tokens,
                 stream=True,
             )
 
