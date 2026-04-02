@@ -38,7 +38,7 @@ export function useAIChat(productId: string | null) {
       return newSession;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   useEffect(() => {
