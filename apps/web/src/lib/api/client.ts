@@ -1,7 +1,9 @@
 import axios, { type AxiosError, type AxiosInstance } from "axios";
 import { ApiError, type ApiErrorResponse } from "./errors";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4006";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const AUTH_TOKEN_KEY = "access_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -22,27 +24,25 @@ function processQueue(error: unknown, token: string | null): void {
 
 function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token") ?? localStorage.getItem("mizan_auth_token");
+  return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
 function getRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("refresh_token");
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 function setTokens(access: string, refresh: string): void {
-  localStorage.setItem("access_token", access);
-  localStorage.setItem("mizan_auth_token", access);
-  localStorage.setItem("refresh_token", refresh);
+  localStorage.setItem(AUTH_TOKEN_KEY, access);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
   if (typeof document !== "undefined") {
-    document.cookie = `access_token=${access}; path=/; max-age=604800; SameSite=Lax`;
+    document.cookie = `access_token=${access}; path=/; max-age=604800; SameSite=Strict; Secure`;
   }
 }
 
 export function clearTokens(): void {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("mizan_auth_token");
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   if (typeof document !== "undefined") {
     document.cookie = "access_token=; path=/; max-age=0";
   }
@@ -118,4 +118,4 @@ apiClient.interceptors.response.use(
   },
 );
 
-export { API_BASE_URL, setTokens };
+export { API_BASE_URL, AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, setTokens };

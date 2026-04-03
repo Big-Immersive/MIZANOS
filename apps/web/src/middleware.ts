@@ -6,24 +6,34 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 }
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
-  // Allow public paths
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Check for JWT token in cookies
   const token = request.cookies.get("access_token")?.value;
 
-  if (!token) {
+  if (!token || isTokenExpired(token)) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(loginUrl);
+    if (token) {
+      response.cookies.delete("access_token");
+    }
+    return response;
   }
 
-  // TODO: Optionally validate JWT expiry here for server-side check
   return NextResponse.next();
 }
 

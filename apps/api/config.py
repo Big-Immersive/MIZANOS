@@ -12,8 +12,11 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379"
 
+    # Environment
+    environment: str = "development"
+
     # JWT
-    jwt_secret_key: str = "dev-secret-change-in-production"
+    jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 1440
     jwt_refresh_token_expire_days: int = 7
@@ -54,7 +57,7 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ""
 
     # Encryption
-    credential_encryption_key: str = "dev-encryption-key-change-in-production"
+    credential_encryption_key: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
