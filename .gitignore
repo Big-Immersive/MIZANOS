@@ -52,3 +52,4 @@ infra/migrate-prod.sh
 # Lovable source artifacts
 lovable-source/node_modules/
 lovable-source/bun.lockb
+tmpclaude-*-cwd
