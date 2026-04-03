@@ -194,7 +194,7 @@ export function ActionItems({ metrics: metricsProp, filterProductIds }: ActionIt
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[260px] pr-2">
+        <ScrollArea className="h-[400px] pr-2">
           <div className="space-y-1.5">
             {actionItems.slice(0, 12).map((item, index) => {
               const styles = severityStyles[item.severity];
