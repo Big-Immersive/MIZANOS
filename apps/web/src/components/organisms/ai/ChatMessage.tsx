@@ -2,8 +2,10 @@
 
 import { Bot, User } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils/cn";
+import { CodeBlock } from "@/components/atoms/display/CodeBlock";
 import type { AIChatMessage } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -15,40 +17,23 @@ interface ChatMessageProps {
   streaming?: boolean;
 }
 
-function cleanAssistantContent(content: string): string {
-  if (!content) return content;
-  // Remove standalone JSON blocks like {"key": "value"} or {_key: [...]}
-  let cleaned = content.replace(/\{[^{}]*(?:"[^"]*"[^{}]*)*\}/g, (match) => {
-    // Only strip if it looks like JSON (has colons and quotes/brackets)
-    if (match.includes(":") && (match.includes('"') || match.includes("["))) {
-      return "";
-    }
-    return match;
-  });
-  // Clean up extra whitespace
-  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
-  return cleaned || content;
-}
-
 // ---------------------------------------------------------------------------
 // Markdown component overrides
 // ---------------------------------------------------------------------------
 
+const remarkPlugins = [remarkGfm];
+
 const markdownComponents: Components = {
-  code: ({ className, children, ...props }) => {
-    const isInline = !className;
-    return isInline ? (
-      <code
-        className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono"
-        {...props}
-      >
-        {children}
-      </code>
-    ) : (
-      <code
-        className="block bg-background/50 p-2 rounded text-xs font-mono overflow-x-auto"
-        {...props}
-      >
+  code: ({ className, children }) => {
+    const match = /language-(\w+)/.exec(className ?? "");
+    const codeString = String(children).replace(/\n$/, "");
+
+    if (match) {
+      return <CodeBlock code={codeString} language={match[1]} />;
+    }
+
+    return (
+      <code className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono">
         {children}
       </code>
     );
@@ -124,12 +109,18 @@ export function ChatMessage({ message, streaming }: ChatMessageProps) {
       >
         {isUser ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        ) : streaming ? (
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown components={markdownComponents}>
-              {cleanAssistantContent(message.content)}
+          <div
+            className={cn(
+              "prose prose-sm dark:prose-invert max-w-none",
+              streaming && "streaming-cursor",
+            )}
+          >
+            <ReactMarkdown
+              remarkPlugins={remarkPlugins}
+              components={markdownComponents}
+            >
+              {message.content}
             </ReactMarkdown>
           </div>
         )}
