@@ -31,6 +31,7 @@ export function useUpdateTask(productId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks", productId] });
       queryClient.invalidateQueries({ queryKey: ["tasks", "all"] });
+      queryClient.invalidateQueries({ queryKey: ["milestones", productId] });
     },
     onError: (error: Error) => {
       toast.error("Failed to update task: " + error.message);

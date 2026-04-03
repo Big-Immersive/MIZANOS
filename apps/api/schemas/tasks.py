@@ -44,6 +44,7 @@ class TaskUpdate(BaseSchema):
     priority: str | None = None
     pillar: str | None = None
     assignee_id: UUID | None = None
+    milestone_id: UUID | None = None
     due_date: datetime | None = None
     estimated_hours: float | None = None
     sort_order: int | None = None

@@ -12,6 +12,7 @@ import type { AIChatMessage } from "@/lib/types";
 
 interface ChatMessageProps {
   message: AIChatMessage;
+  streaming?: boolean;
 }
 
 function cleanAssistantContent(content: string): string {
@@ -95,7 +96,7 @@ const markdownComponents: Components = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, streaming }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   return (
@@ -122,6 +123,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
       >
         {isUser ? (
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        ) : streaming ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none">

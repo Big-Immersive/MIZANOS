@@ -21,6 +21,7 @@ import { DeleteTaskDialog } from "@/components/molecules/feedback/DeleteTaskDial
 import { CommentThread } from "@/components/molecules/comments/CommentThread";
 import { TaskChecklist } from "@/components/molecules/tasks/TaskChecklist";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
+import { useMilestones } from "@/hooks/queries/useMilestones";
 import { useUpdateTask, useDeleteTask } from "@/hooks/mutations/useTaskMutations";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 import type { KanbanTask, PillarType, TaskPriority, ProductMember } from "@/lib/types";
@@ -33,6 +34,7 @@ const taskSchema = z.object({
   status: z.string(),
   due_date: z.string().optional(),
   assignee_id: z.string().optional(),
+  milestone_id: z.string().optional(),
 });
 type TaskFormValues = z.infer<typeof taskSchema>;
 
@@ -93,6 +95,7 @@ export function TaskDetailDrawer({
   deleteMutation,
 }: TaskDetailDrawerProps) {
   const { data: members = [] } = useProductMembers(productId);
+  const { data: milestones = [] } = useMilestones(productId);
   const defaultUpdate = useUpdateTask(productId);
   const defaultDelete = useDeleteTask(productId);
   const updateTask = updateMutation ?? defaultUpdate;
@@ -108,6 +111,10 @@ export function TaskDetailDrawer({
   const canEditDetails = canManageTasks || isCreator;
   const canDeleteTask = canEditDetails;
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const milestoneOptions = useMemo(() =>
+    milestones.map((m) => ({ value: m.id, label: m.title })),
+  [milestones]);
 
   const assigneeOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -133,7 +140,7 @@ export function TaskDetailDrawer({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: "", description: "", pillar: "development",
-      priority: "medium", status: "backlog", due_date: "", assignee_id: "",
+      priority: "medium", status: "backlog", due_date: "", assignee_id: "", milestone_id: "",
     },
   });
 
@@ -147,6 +154,7 @@ export function TaskDetailDrawer({
         status: task.status,
         due_date: task.dueDate?.slice(0, 10) ?? "",
         assignee_id: task.assigneeId ?? "__none__",
+        milestone_id: task.milestoneId ?? "",
       });
     }
   }, [task, open, reset]);
@@ -154,7 +162,7 @@ export function TaskDetailDrawer({
   const onFormSubmit = (values: TaskFormValues) => {
     if (!task) return;
     const base = { id: task.id, status: values.status };
-    const details = { title: values.title, description: values.description ?? null, pillar: values.pillar, priority: values.priority, due_date: values.due_date || null };
+    const details = { title: values.title, description: values.description ?? null, pillar: values.pillar, priority: values.priority, due_date: values.due_date || null, milestone_id: values.milestone_id || null };
     const payload = canManageTasks
       ? { ...base, ...details, assignee_id: values.assignee_id === "__none__" ? null : (values.assignee_id ?? null) }
       : isCreator ? { ...base, ...details } : base;
@@ -165,6 +173,7 @@ export function TaskDetailDrawer({
   const currentPriority = watch("priority");
   const currentStatus = watch("status");
   const currentAssignee = watch("assignee_id");
+  const currentMilestone = watch("milestone_id");
   const isUnassigned = !currentAssignee || currentAssignee === "__none__";
   const [assignWarning, setAssignWarning] = useState(false);
 
@@ -213,6 +222,16 @@ export function TaskDetailDrawer({
                     setTimeout(() => setAssignWarning(false), 3000);
                   }
                 }}
+              />
+            )}
+
+            {milestoneOptions.length > 0 && canEditDetails && (
+              <SelectField
+                label="Milestone"
+                placeholder="Select milestone"
+                options={milestoneOptions}
+                value={currentMilestone || ""}
+                onValueChange={(v) => setValue("milestone_id", v)}
               />
             )}
 

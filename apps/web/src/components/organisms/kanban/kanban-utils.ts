@@ -39,5 +39,6 @@ export function toKanbanTask(
     createdAt: task.created_at,
     updatedAt: task.updated_at ?? undefined,
     subtaskCount: task.subtask_count ?? 0,
+    milestoneId: task.milestone_id ?? undefined,
   };
 }

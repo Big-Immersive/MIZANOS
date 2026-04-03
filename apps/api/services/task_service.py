@@ -290,7 +290,7 @@ class TaskService(BaseService[Task]):
         if user is not None and not self._can_manage_tasks(user):
             task = await self.get_or_404(entity_id)
             is_creator = task.created_by is not None and task.created_by == user.profile_id
-            allowed = {"status", "title", "description", "priority", "pillar", "due_date"} if is_creator else {"status"}
+            allowed = {"status", "title", "description", "priority", "pillar", "due_date", "milestone_id"} if is_creator else {"status"}
             restricted = set(data.keys()) - allowed
             if restricted:
                 raise forbidden(
