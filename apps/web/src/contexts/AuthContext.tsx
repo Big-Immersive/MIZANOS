@@ -7,7 +7,7 @@ import {
   useContext,
   type ReactNode,
 } from "react";
-import { API_BASE_URL, AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/api/client";
+import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/api/client";
 
 interface User {
   id: string;
@@ -37,10 +37,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
-  apiBaseUrl?: string;
 }
 
-function AuthProvider({ children, apiBaseUrl = API_BASE_URL }: AuthProviderProps) {
+function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +47,7 @@ function AuthProvider({ children, apiBaseUrl = API_BASE_URL }: AuthProviderProps
   useEffect(() => {
     const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
     if (storedToken) {
-      fetch(`${apiBaseUrl}/auth/me`, {
+      fetch("/api/auth/me", {
         headers: { Authorization: `Bearer ${storedToken}` },
       })
         .then((res) => (res.ok ? res.json() : Promise.reject()))
@@ -66,7 +65,7 @@ function AuthProvider({ children, apiBaseUrl = API_BASE_URL }: AuthProviderProps
     } else {
       setLoading(false);
     }
-  }, [apiBaseUrl]);
+  }, []);
 
   const _storeAuthResponse = (data: {
     access_token: string;
@@ -87,7 +86,7 @@ function AuthProvider({ children, apiBaseUrl = API_BASE_URL }: AuthProviderProps
     password: string,
   ): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/login`, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -109,7 +108,7 @@ function AuthProvider({ children, apiBaseUrl = API_BASE_URL }: AuthProviderProps
     idToken: string,
   ): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/google`, {
+      const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id_token: idToken }),
@@ -141,7 +140,7 @@ function AuthProvider({ children, apiBaseUrl = API_BASE_URL }: AuthProviderProps
     fullName: string,
   ): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/register`, {
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, full_name: fullName }),

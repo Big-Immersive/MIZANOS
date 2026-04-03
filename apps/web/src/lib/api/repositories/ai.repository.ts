@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { AIChatSession, AIChatMessage } from "@/lib/types";
-import { apiClient, API_BASE_URL, AUTH_TOKEN_KEY } from "../client";
+import { apiClient, AUTH_TOKEN_KEY } from "../client";
 
 export class AIRepository {
   private readonly client: AxiosInstance;
@@ -70,7 +70,7 @@ export class AIRepository {
     // Find the last user message (skip empty assistant placeholders)
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user" && m.content);
     const response = await fetch(
-      `${API_BASE_URL}/ai/chat`,
+      "/api/ai/chat",
       {
         method: "POST",
         headers: {
