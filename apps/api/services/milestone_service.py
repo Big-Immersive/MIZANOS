@@ -59,14 +59,11 @@ class MilestoneService:
 
     async def delete_milestone(self, milestone_id: UUID) -> None:
         m = await self.get_milestone(milestone_id)
-        if m.is_default:
-            raise ValueError("Cannot delete the default milestone")
-        # Move tasks to default milestone
-        default = await self._get_or_create_default(m.product_id)
+        # Delete all tasks inside this milestone
         stmt = select(Task).where(Task.milestone_id == milestone_id)
         tasks = list((await self.session.execute(stmt)).scalars().all())
         for t in tasks:
-            t.milestone_id = default.id
+            await self.session.delete(t)
         await self.session.delete(m)
         await self.session.flush()
 

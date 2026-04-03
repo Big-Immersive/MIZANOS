@@ -12,6 +12,7 @@ import type { AIChatMessage } from "@/lib/types";
 
 interface ChatMessageProps {
   message: AIChatMessage;
+  streaming?: boolean;
 }
 
 function cleanAssistantContent(content: string): string {
@@ -24,8 +25,6 @@ function cleanAssistantContent(content: string): string {
     }
     return match;
   });
-  // Remove ** bold markers
-  cleaned = cleaned.replace(/\*\*/g, "");
   // Clean up extra whitespace
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
   return cleaned || content;
@@ -97,7 +96,7 @@ const markdownComponents: Components = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, streaming }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   return (
@@ -124,6 +123,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
       >
         {isUser ? (
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        ) : streaming ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none">

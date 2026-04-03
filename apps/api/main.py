@@ -61,14 +61,23 @@ from apps.api.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: startup and shutdown events."""
+    if not settings.jwt_secret_key:
+        raise RuntimeError("JWT_SECRET_KEY must be set via environment variable")
+    if not settings.credential_encryption_key:
+        raise RuntimeError("CREDENTIAL_ENCRYPTION_KEY must be set via environment variable")
     yield
 
+
+_is_production = settings.environment == "production"
 
 app = FastAPI(
     title="Mizan Flow API",
     version="0.1.0",
     description="Product Lifecycle Management Platform",
     lifespan=lifespan,
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 # Middleware stack (order matters - last added runs first)
@@ -78,8 +87,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 def _cors_headers(request: Request) -> dict[str, str]:

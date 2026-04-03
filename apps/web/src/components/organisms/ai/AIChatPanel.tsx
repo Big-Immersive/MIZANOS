@@ -140,8 +140,12 @@ export function AIChatPanel({
           />
         ) : (
           <div className="space-y-4">
-            {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} />
+            {messages.map((msg, i) => (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                streaming={isStreaming && msg.role === "assistant" && i === messages.length - 1}
+              />
             ))}
             {showStreamingIndicator && <StreamingIndicator />}
             <div ref={bottomRef} />

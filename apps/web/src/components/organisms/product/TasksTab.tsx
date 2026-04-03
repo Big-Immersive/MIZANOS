@@ -50,7 +50,9 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
   const [milestoneAssignees, setMilestoneAssignees] = useState<string[]>([]);
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
   const [collapsedMilestones, setCollapsedMilestones] = useState<Set<string>>(new Set());
+  const [deleteMilestoneId, setDeleteMilestoneId] = useState<string | null>(null);
   const { data: milestones = [] } = useMilestones(productId);
+  const deleteMilestoneData = milestones.find((m) => m.id === deleteMilestoneId);
   const createMilestone = useCreateMilestone(productId);
   const deleteMilestone = useDeleteMilestone(productId);
   const updateMilestone = useUpdateMilestone(productId);
@@ -330,16 +332,12 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
                 ))}
                 <span className="flex-1" />
                 <Badge variant="secondary" className="text-[10px]">{milestoneTasks.length} tasks</Badge>
-                {!milestone.is_default && (
-                  <button type="button" onClick={(e) => { e.stopPropagation(); openEditMilestone(milestone); }} className="p-1 rounded hover:bg-accent">
-                    <Pencil className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                )}
-                {!milestone.is_default && (
-                  <button type="button" onClick={(e) => { e.stopPropagation(); deleteMilestone.mutate(milestone.id); }} className="p-1 rounded hover:bg-destructive/10">
-                    <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                  </button>
-                )}
+                <button type="button" onClick={(e) => { e.stopPropagation(); openEditMilestone(milestone); }} className="p-1 rounded hover:bg-accent">
+                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                </button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setDeleteMilestoneId(milestone.id); }} className="p-1 rounded hover:bg-destructive/10">
+                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                </button>
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); setAddTaskMilestoneId(milestone.id); setAddDialogOpen(true); }}>
                   <Plus className="h-3 w-3 mr-1" /> Add Task
                 </Button>
@@ -465,6 +463,30 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
               <Button variant="outline" size="sm" onClick={resetMilestoneForm}>Cancel</Button>
               <Button size="sm" onClick={handleCreateMilestone} disabled={!milestoneTitle.trim() || createMilestone.isPending || updateMilestone.isPending}>
                 {createMilestone.isPending || updateMilestone.isPending ? "Saving..." : editingMilestoneId ? "Update Milestone" : "Create Milestone"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete milestone confirmation */}
+      {deleteMilestoneId && deleteMilestoneData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg p-6 w-full max-w-md space-y-4">
+            <h3 className="text-lg font-semibold text-destructive">Delete Milestone</h3>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <strong>{deleteMilestoneData.title}</strong>?
+              All tasks inside this milestone will also be permanently deleted.
+            </p>
+            <p className="text-sm font-medium">
+              {tasksByMilestone.get(deleteMilestoneId)?.length ?? 0} task(s) will be deleted.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDeleteMilestoneId(null)}>Cancel</Button>
+              <Button variant="destructive" size="sm" disabled={deleteMilestone.isPending} onClick={() => {
+                deleteMilestone.mutate(deleteMilestoneId, { onSuccess: () => setDeleteMilestoneId(null) });
+              }}>
+                {deleteMilestone.isPending ? "Deleting..." : "Delete Milestone & Tasks"}
               </Button>
             </div>
           </div>

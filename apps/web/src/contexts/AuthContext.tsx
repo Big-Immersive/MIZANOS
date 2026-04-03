@@ -7,6 +7,7 @@ import {
   useContext,
   type ReactNode,
 } from "react";
+import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/lib/api/client";
 
 interface User {
   id: string;
@@ -34,59 +35,48 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = "mizan_auth_token";
-const USER_KEY = "mizan_auth_user";
-
 interface AuthProviderProps {
   children: ReactNode;
-  apiBaseUrl?: string;
 }
 
-const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4006";
-
-function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderProps) {
+function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_KEY);
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
     if (storedToken) {
-      fetch(`${apiBaseUrl}/auth/me`, {
+      fetch("/api/auth/me", {
         headers: { Authorization: `Bearer ${storedToken}` },
       })
         .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((userData) => {
           setToken(storedToken);
           setUser(userData);
-          localStorage.setItem("access_token", storedToken);
-          document.cookie = `access_token=${storedToken}; path=/; max-age=604800; SameSite=Lax`;
+          document.cookie = `access_token=${storedToken}; path=/; max-age=604800; SameSite=Strict; Secure`;
         })
         .catch(() => {
-          localStorage.removeItem(TOKEN_KEY);
-          localStorage.removeItem(USER_KEY);
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          localStorage.removeItem(REFRESH_TOKEN_KEY);
           document.cookie = "access_token=; path=/; max-age=0";
         })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
-  }, [apiBaseUrl]);
+  }, []);
 
   const _storeAuthResponse = (data: {
     access_token: string;
     refresh_token?: string;
     user: { id: string; profile_id?: string; email: string; full_name?: string; role?: string; avatar_url?: string | null };
   }) => {
-    localStorage.setItem(TOKEN_KEY, data.access_token);
-    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
     if (data.refresh_token) {
-      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
     }
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-    document.cookie = `access_token=${data.access_token}; path=/; max-age=604800; SameSite=Lax`;
+    document.cookie = `access_token=${data.access_token}; path=/; max-age=604800; SameSite=Strict; Secure`;
     setToken(data.access_token);
     setUser(data.user);
   };
@@ -96,7 +86,7 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
     password: string,
   ): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/login`, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -118,7 +108,7 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
     idToken: string,
   ): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/google`, {
+      const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id_token: idToken }),
@@ -137,10 +127,8 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
   };
 
   const logout = async () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     document.cookie = "access_token=; path=/; max-age=0";
     setToken(null);
     setUser(null);
@@ -152,7 +140,7 @@ function AuthProvider({ children, apiBaseUrl = DEFAULT_API_URL }: AuthProviderPr
     fullName: string,
   ): Promise<{ error: Error | null }> => {
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/register`, {
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, full_name: fullName }),

@@ -79,6 +79,7 @@ export interface KanbanTask {
   createdAt: string;
   updatedAt?: string;
   subtaskCount?: number;
+  milestoneId?: string;
 }
 
 export interface KanbanColumn {

@@ -13,12 +13,15 @@ import {
   Rocket,
   ChevronRight,
   CheckCircle2,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useDashboardMetrics, type DashboardMetrics } from "@/hooks/queries/useDashboardMetrics";
 
 interface ActionItem {
   id: string;
+  taskId?: string;
   type: "overdue" | "failed_qa" | "low_audit" | "deployment";
   title: string;
   subtitle: string;
@@ -65,6 +68,7 @@ function buildActionItems(metrics: DashboardMetrics | undefined): ActionItem[] {
   metrics.overdueTasks.forEach((t) =>
     items.push({
       id: `task-${t.id}`,
+      taskId: t.id,
       type: "overdue",
       title: t.title,
       subtitle: `Due ${formatDistanceToNow(new Date(t.due_date), { addSuffix: true })}`,
@@ -115,7 +119,7 @@ function buildActionItems(metrics: DashboardMetrics | undefined): ActionItem[] {
 }
 
 export function ActionItems({ metrics: metricsProp, filterProductIds }: ActionItemsProps) {
-  const { data: fetchedMetrics } = useDashboardMetrics();
+  const { data: fetchedMetrics, isLoading, isRefetching, refetch } = useDashboardMetrics();
   const metrics = metricsProp ?? fetchedMetrics;
   const allItems = buildActionItems(metrics);
   const actionItems = filterProductIds
@@ -124,7 +128,7 @@ export function ActionItems({ metrics: metricsProp, filterProductIds }: ActionIt
   const criticalCount = actionItems.filter((i) => i.severity === "critical").length;
   const warningCount = actionItems.filter((i) => i.severity === "warning").length;
 
-  if (actionItems.length === 0) {
+  if (isLoading) {
     return (
       <Card className="h-full">
         <CardHeader>
@@ -132,6 +136,30 @@ export function ActionItems({ metrics: metricsProp, filterProductIds }: ActionIt
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             Action Required
           </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">Loading action items...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (actionItems.length === 0) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              Action Required
+            </CardTitle>
+            <button type="button" onClick={() => refetch()} disabled={isRefetching} className="p-1.5 rounded-md hover:bg-accent transition-colors">
+              <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", isRefetching && "animate-spin")} />
+            </button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -156,9 +184,12 @@ export function ActionItems({ metrics: metricsProp, filterProductIds }: ActionIt
             </div>
             Action Required
           </CardTitle>
-          <div className="flex gap-1.5">
+          <div className="flex items-center gap-1.5">
             {criticalCount > 0 && <Badge variant="destructive" className="text-xs">{criticalCount} Critical</Badge>}
             {warningCount > 0 && <Badge variant="outline" className="text-xs border-status-warning/50 text-status-warning">{warningCount} Warning</Badge>}
+            <button type="button" onClick={() => refetch()} disabled={isRefetching} className="p-1.5 rounded-md hover:bg-accent transition-colors ml-1">
+              <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", isRefetching && "animate-spin")} />
+            </button>
           </div>
         </div>
       </CardHeader>
@@ -170,7 +201,7 @@ export function ActionItems({ metrics: metricsProp, filterProductIds }: ActionIt
               return (
                 <Link
                   key={item.id}
-                  href={`/projects/${item.productId}`}
+                  href={item.taskId ? `/projects/${item.productId}?tab=tasks&task=${item.taskId}` : `/projects/${item.productId}`}
                   className={cn("block p-2.5 rounded-lg border transition-all duration-200 group", styles.border, styles.bg)}
                   style={{ opacity: 0, animation: `fade-in 0.2s ease-out ${index * 50}ms forwards` }}
                 >

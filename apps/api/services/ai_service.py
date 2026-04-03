@@ -375,6 +375,16 @@ class AIService:
         self.session.add(user_msg)
         await self.session.flush()
 
+        # Load recent conversation history for context
+        history_stmt = (
+            select(AIChatMessage)
+            .where(AIChatMessage.session_id == session_id)
+            .order_by(AIChatMessage.created_at.desc())
+            .limit(20)
+        )
+        history = list((await self.session.execute(history_stmt)).scalars().all())
+        history.reverse()
+
         # Gather project context
         project_context = await self._gather_project_context(chat_session.product_id)
 
@@ -389,8 +399,11 @@ class AIService:
 
             messages: list[dict[str, str]] = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": content},
             ]
+            # Include conversation history (skip empty placeholders)
+            for msg in history:
+                if msg.content and msg.content.strip():
+                    messages.append({"role": msg.role, "content": msg.content})
 
             client = openai.AsyncOpenAI(
                 api_key=config.api_key, base_url=config.base_url,

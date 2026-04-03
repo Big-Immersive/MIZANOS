@@ -1,8 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { AIChatSession, AIChatMessage } from "@/lib/types";
-import { apiClient } from "../client";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4006";
+import { apiClient, AUTH_TOKEN_KEY } from "../client";
 
 export class AIRepository {
   private readonly client: AxiosInstance;
@@ -66,13 +64,13 @@ export class AIRepository {
     signal?: AbortSignal,
   ): Promise<Response> {
     const token = typeof window !== "undefined"
-      ? localStorage.getItem("access_token")
+      ? localStorage.getItem(AUTH_TOKEN_KEY)
       : null;
 
     // Find the last user message (skip empty assistant placeholders)
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user" && m.content);
     const response = await fetch(
-      `${API_BASE_URL}/ai/chat`,
+      "/api/ai/chat",
       {
         method: "POST",
         headers: {
