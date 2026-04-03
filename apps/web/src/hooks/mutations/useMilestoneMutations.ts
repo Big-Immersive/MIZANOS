@@ -28,7 +28,11 @@ export function useDeleteMilestone(productId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => milestonesRepository.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["milestones", productId] }); toast.success("Milestone deleted"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["milestones", productId] });
+      qc.invalidateQueries({ queryKey: ["tasks", productId] });
+      toast.success("Milestone and tasks deleted");
+    },
     onError: (e: Error) => toast.error("Failed: " + e.message),
   });
 }
