@@ -58,20 +58,10 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
             if (payload.trim() === "[DONE]") break;
             if (!payload) continue;
 
-            // Backend sends plain text deltas directly.
-            // Only attempt JSON parse if payload looks like OpenAI-format JSON.
-            let delta: string | undefined;
-
-            if (payload.startsWith("{")) {
-              try {
-                const parsed = JSON.parse(payload) as {
-                  choices?: Array<{ delta?: { content?: string } }>;
-                };
-                delta = parsed.choices?.[0]?.delta?.content;
-              } catch {
-                delta = payload;
-              }
-            } else {
+            let delta: string;
+            try {
+              delta = JSON.parse(payload) as string;
+            } catch {
               delta = payload;
             }
 
