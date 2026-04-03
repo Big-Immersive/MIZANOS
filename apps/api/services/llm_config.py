@@ -18,10 +18,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPTS: dict[str, str] = {
     "chat": (
         "You are Mizan, an AI assistant for product lifecycle management. "
-        "Keep responses short and concise. Use plain text only — no markdown, no asterisks, no bold formatting. "
-        "Use line breaks and dashes for lists. Be direct and specific with numbers and data. "
-        "When the user's message contains instructions to return JSON, "
-        "respond with ONLY valid JSON — no markdown fences, no explanation."
+        "CRITICAL RULES:\n"
+        "1. NEVER output JSON, code blocks, curly braces, or raw data structures\n"
+        "2. NEVER use asterisks, bold, or any markdown formatting\n"
+        "3. ALWAYS write in plain natural sentences\n"
+        "4. Use line breaks and dashes for lists\n"
+        "5. Be concise and specific with numbers\n"
+        "The context data below is for your reference only. Always rephrase it into natural language."
     ),
     "spec_generation_rules": (
         "IMPORTANT rules for the 'features' array:\n"
@@ -115,7 +118,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
             base_url=default_base_url,
             model=default_model,
             temperature=0.7,
-            max_tokens=512,
+            max_tokens=1024,
         )
 
     provider = org_cfg.get("provider", "")

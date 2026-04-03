@@ -22,14 +22,12 @@ export function useAIChat(productId: string | null) {
       if (!user?.id) return null;
       const sessions = await aiRepository.getSessions();
       const existing = sessions.find(
-        (s) => s.product_id === productId,
+        (s) => (productId ? s.product_id === productId : !s.product_id),
       );
       if (existing) {
-        if (sessionIdRef.current !== existing.id) {
-          sessionIdRef.current = existing.id;
-          const msgs = await aiRepository.getMessages(existing.id);
-          setMessages(msgs);
-        }
+        sessionIdRef.current = existing.id;
+        const msgs = await aiRepository.getMessages(existing.id);
+        setMessages(msgs);
         return existing;
       }
       const newSession = await aiRepository.createSession(
@@ -40,13 +38,15 @@ export function useAIChat(productId: string | null) {
       return newSession;
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   useEffect(() => {
-    sessionIdRef.current = null;
-    setMessages([]);
-    setError(null);
+    if (productId !== undefined) {
+      sessionIdRef.current = null;
+      setMessages([]);
+      setError(null);
+    }
   }, [productId]);
 
   const { isStreaming, streamMessage, cancelStream } = useAIChatStream({
@@ -86,7 +86,13 @@ export function useAIChat(productId: string | null) {
         },
       ]);
 
-      await streamMessage(session.id, [...messagesRef.current], assistantMsgId);
+      // Pass user message explicitly since state may not be updated yet
+      const msgsForStream = [...messagesRef.current];
+      // Ensure the user message is in the list
+      if (!msgsForStream.some((m) => m.id === userMsgId)) {
+        msgsForStream.push(userMsg);
+      }
+      await streamMessage(session.id, msgsForStream, assistantMsgId);
     },
     [session, isStreaming, streamMessage],
   );

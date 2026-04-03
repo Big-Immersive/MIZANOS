@@ -13,8 +13,6 @@ import { ProductsSection } from "@/components/organisms/dashboard/ProductsSectio
 import { ReportsSummaryCard } from "@/components/organisms/dashboard/ReportsSummaryCard";
 import { useProducts } from "@/hooks/queries/useProducts";
 import { useMyDashboard } from "@/hooks/utils/useMyDashboard";
-import { FloatingAIButton } from "@/components/organisms/ai/FloatingAIButton";
-
 export default function DashboardPage() {
   const { enabled: myDashboard, toggle, myProductIds } = useMyDashboard();
   const { data: products = [] } = useProducts();
@@ -37,8 +35,8 @@ export default function DashboardPage() {
   const quickStats = useMemo(() => {
     const source = myProductIds ? filteredProducts : products;
     const total = source.length;
-    const healthy = source.filter((p) => p.stage === "Complete").length;
-    const deployment = source.filter((p) => p.stage === "Deployment").length;
+    const healthy = source.filter((p) => p.stage === "Launched" || p.stage === "Live").length;
+    const deployment = source.filter((p) => p.stage === "Dev Ready" || p.stage === "Soft Launch").length;
     return { totalProducts: total, healthyCount: healthy, deploymentStageCount: deployment };
   }, [myProductIds, filteredProducts, products]);
 
@@ -94,7 +92,6 @@ export default function DashboardPage() {
       </div>
 
       <ProductsSection filterProductIds={myProductIds} />
-      <FloatingAIButton productName="All Projects" />
     </div>
   );
 }

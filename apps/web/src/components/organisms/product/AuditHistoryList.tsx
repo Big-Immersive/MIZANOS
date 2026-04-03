@@ -92,12 +92,12 @@ function ComparisonCard({
 
   const diffs: Array<{ key: string; diff: number }> = [
     { key: "Overall", diff: scoreDiff },
-    { key: "Style", diff: currentCats.style - previousCats.style },
+    { key: "Code Confidence", diff: currentCats.style - previousCats.style },
     {
       key: "Architecture",
       diff: currentCats.architecture - previousCats.architecture,
     },
-    { key: "Security", diff: currentCats.security - previousCats.security },
+    { key: "Delivery Health", diff: currentCats.security - previousCats.security },
     {
       key: "Performance",
       diff: currentCats.performance - previousCats.performance,

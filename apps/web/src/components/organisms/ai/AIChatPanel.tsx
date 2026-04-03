@@ -91,11 +91,11 @@ export function AIChatPanel({
     clearChat,
   } = useAIChat(productId);
 
+  const bottomRef = useRef<HTMLDivElement>(null);
+
   // Auto-scroll on new messages and during streaming
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
   // Focus input when panel opens
@@ -144,6 +144,7 @@ export function AIChatPanel({
               <ChatMessage key={msg.id} message={msg} />
             ))}
             {showStreamingIndicator && <StreamingIndicator />}
+            <div ref={bottomRef} />
           </div>
         )}
       </ScrollArea>

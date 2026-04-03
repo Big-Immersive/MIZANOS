@@ -49,6 +49,13 @@ const CATEGORY_ICONS: Record<string, typeof FileCode> = {
   performance: Gauge,
 };
 
+const CATEGORY_LABELS: Record<string, string> = {
+  style: "Code Confidence",
+  architecture: "Architecture",
+  security: "Delivery Health",
+  performance: "Performance",
+};
+
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   style: "Code-task matching confidence from scan",
   architecture: "Task coverage verified in codebase",
@@ -163,7 +170,7 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
                   <div key={key} className="space-y-1">
                     <div className="flex items-center gap-1.5">
                       <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm capitalize font-medium">{key}</span>
+                      <span className="text-sm font-medium">{CATEGORY_LABELS[key] ?? key}</span>
                     </div>
                     <span className={`text-lg font-bold tabular-nums ${color}`}>{rounded}%</span>
                     <p className="text-[10px] text-muted-foreground leading-tight">

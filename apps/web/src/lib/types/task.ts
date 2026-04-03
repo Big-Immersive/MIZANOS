@@ -19,6 +19,7 @@ export interface Task {
   domain_group: string | null;
   phase: string | null;
   task_type: string;
+  milestone_id: string | null;
   parent_id: string | null;
   subtask_count: number;
   is_draft: boolean;

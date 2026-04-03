@@ -55,14 +55,19 @@ export function useDashboardMetrics() {
   return useQuery({
     queryKey: ["dashboard-metrics", user?.id],
     queryFn: async (): Promise<DashboardMetrics> => {
-      const [productsResult, notifications] = await Promise.all([
+      const [productsResult, allTasksResult, notifications] = await Promise.all([
         productsRepository.getAll({ pageSize: 100 }),
+        tasksRepository.getAll({ pageSize: 500, task_type: "task" }),
         notificationsRepository.getAll(),
       ]);
 
-      // Backend returns a plain array, not paginated
       const products = Array.isArray(productsResult) ? productsResult : productsResult.data ?? [];
+      const allTasks: Task[] = Array.isArray(allTasksResult) ? allTasksResult : allTasksResult.data ?? [];
 
+      const productMap = new Map<string, string>();
+      for (const p of products) productMap.set(p.id, p.name);
+
+      // Stage distribution
       const stageMap: Record<string, number> = {};
       for (const p of products) {
         const stage = p.stage || "Unknown";
@@ -72,19 +77,53 @@ export function useDashboardMetrics() {
         ([stage, count]) => ({ stage, count }),
       );
 
+      // Overdue tasks
+      const now = new Date();
+      const overdueTasks = allTasks
+        .filter((t) => t.due_date && new Date(t.due_date) < now && t.status !== "done" && t.status !== "live" && t.status !== "cancelled")
+        .slice(0, 20)
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          due_date: t.due_date!,
+          product_id: t.product_id,
+          product_name: productMap.get(t.product_id) ?? "Unknown",
+          assignee_name: null as string | null,
+          priority: t.priority ?? "medium",
+        }));
+
+      // Low score audits — fetch latest audit per product
+      const lowScoreAudits: DashboardMetrics["lowScoreAudits"] = [];
+      for (const p of products.slice(0, 15)) {
+        try {
+          const audit = await auditRepository.getLatest(p.id);
+          if (audit && audit.overall_score < 60) {
+            lowScoreAudits.push({
+              product_id: p.id,
+              product_name: p.name,
+              overall_score: Math.round(audit.overall_score),
+              run_at: audit.run_at,
+            });
+          }
+        } catch {
+          // skip
+        }
+      }
+
+      // Recent activity
       const recentActivity = notifications.slice(0, 10).map((n: Notification) => ({
         id: n.id,
         type: n.type,
         title: n.title,
         product_id: n.product_id || "",
-        product_name: "",
+        product_name: productMap.get(n.product_id || "") ?? "",
         created_at: n.created_at,
       }));
 
       return {
-        overdueTasks: [],
+        overdueTasks,
         failedQAChecks: [],
-        lowScoreAudits: [],
+        lowScoreAudits,
         incompleteDeployments: [],
         stageDistribution,
         recentActivity,

@@ -70,8 +70,14 @@ export function QuickStats(props: QuickStatsProps) {
 
   const stageDistribution = metrics?.stageDistribution ?? [];
   const totalProducts = props.totalProducts ?? stageDistribution.reduce((sum, s) => sum + s.count, 0);
-  const deploymentStageCount = props.deploymentStageCount ?? (stageDistribution.find((s) => s.stage === "Deployment")?.count ?? 0);
-  const healthyCount = props.healthyCount ?? (stageDistribution.find((s) => s.stage === "Complete")?.count ?? 0);
+  const deploymentStageCount = props.deploymentStageCount ?? (
+    (stageDistribution.find((s) => s.stage === "Dev Ready")?.count ?? 0) +
+    (stageDistribution.find((s) => s.stage === "Soft Launch")?.count ?? 0)
+  );
+  const healthyCount = props.healthyCount ?? (
+    (stageDistribution.find((s) => s.stage === "Launched")?.count ?? 0) +
+    (stageDistribution.find((s) => s.stage === "Live")?.count ?? 0)
+  );
   const filter = props.filterProductIds;
   const overdueTasks = metrics?.overdueTasks ?? [];
   const failedQAChecks = metrics?.failedQAChecks ?? [];

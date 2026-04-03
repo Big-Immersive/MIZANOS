@@ -69,7 +69,8 @@ export class AIRepository {
       ? localStorage.getItem("access_token")
       : null;
 
-    const lastMessage = messages[messages.length - 1];
+    // Find the last user message (skip empty assistant placeholders)
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === "user" && m.content);
     const response = await fetch(
       `${API_BASE_URL}/ai/chat`,
       {
@@ -78,7 +79,7 @@ export class AIRepository {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ session_id: sessionId, content: lastMessage?.content ?? "" }),
+        body: JSON.stringify({ session_id: sessionId, content: lastUserMessage?.content ?? "" }),
         signal,
       },
     );

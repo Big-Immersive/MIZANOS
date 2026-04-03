@@ -14,6 +14,23 @@ interface ChatMessageProps {
   message: AIChatMessage;
 }
 
+function cleanAssistantContent(content: string): string {
+  if (!content) return content;
+  // Remove standalone JSON blocks like {"key": "value"} or {_key: [...]}
+  let cleaned = content.replace(/\{[^{}]*(?:"[^"]*"[^{}]*)*\}/g, (match) => {
+    // Only strip if it looks like JSON (has colons and quotes/brackets)
+    if (match.includes(":") && (match.includes('"') || match.includes("["))) {
+      return "";
+    }
+    return match;
+  });
+  // Remove ** bold markers
+  cleaned = cleaned.replace(/\*\*/g, "");
+  // Clean up extra whitespace
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned || content;
+}
+
 // ---------------------------------------------------------------------------
 // Markdown component overrides
 // ---------------------------------------------------------------------------
@@ -111,7 +128,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown components={markdownComponents}>
-              {message.content}
+              {cleanAssistantContent(message.content)}
             </ReactMarkdown>
           </div>
         )}

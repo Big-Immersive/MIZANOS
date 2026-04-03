@@ -36,7 +36,7 @@ const stageConfig: Record<string, { icon: React.ReactNode; color: string; bg: st
   },
 };
 
-const PRODUCTION_STAGES = ["QA", "Security", "Deployment"];
+const PRODUCTION_STAGES = ["QA", "Security", "Dev Ready", "Soft Launch", "Development"];
 
 function getStatusBadge(status: string | null) {
   switch (status) {
@@ -138,7 +138,7 @@ export function ProductionHealth({ filterProductIds }: ProductionHealthProps) {
         {projects.length === 0 ? (
           <EmptyState />
         ) : (
-          <ScrollArea className="h-[260px] pr-2">
+          <ScrollArea className="h-[400px] pr-2">
             <div className="space-y-1.5">
               {projects.map((project, index) => (
                 <ProjectRow key={project.id} project={project} index={index} />
@@ -167,8 +167,9 @@ function EmptyState() {
 
 function ProjectRow({ project, index }: { project: Product; index: number }) {
   const config = stageConfig[project.stage || ""] || stageConfig.Deployment;
-  const healthScore = project.health_score ?? 0;
   const progress = project.progress ?? 0;
+  // Derive health from progress — no separate health_score field exists
+  const healthScore = progress > 0 ? Math.min(100, Math.round(progress * 1.1)) : 0;
 
   return (
     <Link

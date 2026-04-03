@@ -32,6 +32,7 @@ class TaskCreate(TaskBase):
 
     product_id: UUID
     assignee_id: UUID | None = None
+    milestone_id: UUID | None = None
 
 
 class TaskUpdate(BaseSchema):
@@ -64,6 +65,7 @@ class TaskResponse(TaskBase):
     product_id: UUID
     assignee_id: UUID | None = None
     created_by: UUID | None = None
+    milestone_id: UUID | None = None
     task_type: str = "task"
     parent_id: UUID | None = None
     subtask_count: int = 0

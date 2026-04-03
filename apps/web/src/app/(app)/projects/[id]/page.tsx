@@ -26,7 +26,6 @@ import { QAChecklistTab } from "@/components/organisms/product/QAChecklistTab";
 import { ProductSettingsDialog } from "@/components/organisms/product/ProductSettingsDialog";
 import { LinkGitHubDialog } from "@/components/organisms/product/LinkGitHubDialog";
 import { GitHubLinkBanner } from "@/components/molecules/github/GitHubLinkBanner";
-import { FloatingAIButton } from "@/components/organisms/ai/FloatingAIButton";
 import { Dialog, DialogContent, DialogTitle } from "@/components/atoms/layout/Dialog";
 import { Button } from "@/components/molecules/buttons/Button";
 import { useProductDetail } from "@/hooks/queries/useProductDetail";
@@ -181,10 +180,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           productId={id}
         />
       )}
-      <FloatingAIButton
-        productId={id}
-        productName={productData?.name}
-      />
     </div>
   );
 }
