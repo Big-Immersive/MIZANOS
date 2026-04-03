@@ -583,6 +583,7 @@ class ReportService:
         task_counts = await self._fetch_task_counts(product_ids)
         links_map = await self._fetch_project_links(product_ids)
         code_progress = await self._fetch_code_progress_batch(product_ids)
+        members_map = await self._fetch_members_map(product_ids)
         result: dict[UUID, dict] = {}
         today = datetime.now(timezone.utc).date()
 
@@ -596,7 +597,11 @@ class ReportService:
 
             summary = f"Tasks: {total} total | {done} Done | {in_progress} In Progress | {backlog} Backlog | Code Progress: {cp}%"
 
-            task_result = await self._fetch_task_details_for_report(pid, today)
+            # Check if project has multiple devs
+            dev_names = members_map.get(pid, {}).get("dev_names", [])
+            has_multiple_devs = len(dev_names) > 1
+
+            task_result = await self._fetch_task_details_for_report(pid, today, has_multiple_devs)
 
             result[pid] = {
                 "summary_line": summary,
@@ -608,7 +613,7 @@ class ReportService:
 
         return result
 
-    async def _fetch_task_details_for_report(self, product_id: UUID, today) -> dict:
+    async def _fetch_task_details_for_report(self, product_id: UUID, today, has_multiple_devs: bool = False) -> dict:
         """Fetch in-progress tasks + tasks completed today, grouped by milestone."""
         from apps.api.models.milestone import Milestone
         from apps.api.models.user import Profile
@@ -669,11 +674,12 @@ class ReportService:
                 milestone_order[milestone_name] = row.milestone_order if row.milestone_order is not None else 9999
             milestones[milestone_name].append(task_data)
 
-        # Flag if project has multiple assignees
+        # Show assignee if project has multiple devs OR tasks have multiple different assignees
         has_multiple_assignees = len(assignee_ids) > 1
+        show_assignee = has_multiple_devs or has_multiple_assignees
         for tasks in milestones.values():
             for t in tasks:
-                t["show_assignee"] = has_multiple_assignees
+                t["show_assignee"] = show_assignee
 
         # Sort milestones by order, with "General" last if it exists
         sorted_milestones = sorted(milestones.keys(), key=lambda m: (m == "General", milestone_order.get(m, 9999)))

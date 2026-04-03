@@ -22,7 +22,7 @@ import { useDashboardMetrics, type DashboardMetrics } from "@/hooks/queries/useD
 interface ActionItem {
   id: string;
   taskId?: string;
-  type: "overdue" | "due_soon" | "failed_qa" | "low_audit" | "deployment";
+  type: "overdue" | "due_soon" | "at_risk" | "low_audit" | "deployment";
   title: string;
   subtitle: string;
   productId: string;
@@ -39,7 +39,7 @@ interface ActionItemsProps {
 const iconMap: Record<ActionItem["type"], React.ReactNode> = {
   overdue: <Clock className="h-4 w-4" />,
   due_soon: <AlertTriangle className="h-4 w-4" />,
-  failed_qa: <XCircle className="h-4 w-4" />,
+  at_risk: <XCircle className="h-4 w-4" />,
   low_audit: <ShieldAlert className="h-4 w-4" />,
   deployment: <Rocket className="h-4 w-4" />,
 };
@@ -91,14 +91,14 @@ function buildActionItems(metrics: DashboardMetrics | undefined): ActionItem[] {
       severity: "warning",
     }),
   );
-  metrics.failedQAChecks.forEach((q) =>
+  metrics.atRiskProjects.forEach((p) =>
     items.push({
-      id: `qa-${q.id}`,
-      type: "failed_qa",
-      title: q.title,
-      subtitle: q.category,
-      productId: q.product_id,
-      productName: q.product_name,
+      id: `risk-${p.product_id}`,
+      type: "at_risk",
+      title: p.product_name,
+      subtitle: p.reason,
+      productId: p.product_id,
+      productName: p.product_name,
       severity: "critical",
     }),
   );

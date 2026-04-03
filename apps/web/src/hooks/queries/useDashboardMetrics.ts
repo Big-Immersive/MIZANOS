@@ -23,12 +23,10 @@ export interface DashboardMetrics {
     product_name: string;
     priority: string;
   }>;
-  failedQAChecks: Array<{
-    id: string;
-    title: string;
+  atRiskProjects: Array<{
     product_id: string;
     product_name: string;
-    category: string;
+    reason: string;
   }>;
   lowScoreAudits: Array<{
     product_id: string;
@@ -149,10 +147,42 @@ export function useDashboardMetrics() {
         created_at: n.created_at,
       }));
 
+      // At Risk = projects with low audit scores OR projects with 3+ overdue tasks
+      const overdueByProduct = new Map<string, number>();
+      for (const t of overdueTasks) {
+        overdueByProduct.set(t.product_id, (overdueByProduct.get(t.product_id) || 0) + 1);
+      }
+      const atRiskProjects: Array<{
+        product_id: string;
+        product_name: string;
+        reason: string;
+      }> = [];
+
+      // Add projects with low audit scores
+      for (const audit of lowScoreAudits) {
+        atRiskProjects.push({
+          product_id: audit.product_id,
+          product_name: audit.product_name,
+          reason: `Low audit score: ${audit.overall_score}%`,
+        });
+      }
+
+      // Add projects with 3+ overdue tasks (if not already added)
+      const addedIds = new Set(atRiskProjects.map(p => p.product_id));
+      for (const [pid, count] of overdueByProduct) {
+        if (count >= 3 && !addedIds.has(pid)) {
+          atRiskProjects.push({
+            product_id: pid,
+            product_name: productMap.get(pid) ?? "Unknown",
+            reason: `${count} overdue tasks`,
+          });
+        }
+      }
+
       return {
         overdueTasks,
         dueSoonTasks,
-        failedQAChecks: [],
+        atRiskProjects,
         lowScoreAudits,
         incompleteDeployments: [],
         stageDistribution,
