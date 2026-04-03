@@ -23,7 +23,8 @@ COPY infra/alembic.ini ./infra/alembic.ini
 COPY infra/start-api.sh ./start-api.sh
 RUN chmod +x ./start-api.sh
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
+    && mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
 USER appuser
 
 EXPOSE ${PORT:-8000}
