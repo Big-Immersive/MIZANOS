@@ -45,6 +45,7 @@ export interface DashboardMetrics {
     stage: string;
     count: number;
   }>;
+  projectsByStage: Record<string, Array<{ id: string; name: string }>>;
   recentActivity: Array<{
     id: string;
     type: string;
@@ -73,11 +74,16 @@ export function useDashboardMetrics() {
       const productMap = new Map<string, string>();
       for (const p of products) productMap.set(p.id, p.name);
 
-      // Stage distribution
+      // Stage distribution + projects by stage
       const stageMap: Record<string, number> = {};
+      const projectsByStage: Record<string, Array<{ id: string; name: string }>> = {};
       for (const p of products) {
         const stage = p.stage || "Unknown";
         stageMap[stage] = (stageMap[stage] || 0) + 1;
+        if (!projectsByStage[stage]) {
+          projectsByStage[stage] = [];
+        }
+        projectsByStage[stage].push({ id: p.id, name: p.name });
       }
       const stageDistribution = Object.entries(stageMap).map(
         ([stage, count]) => ({ stage, count }),
@@ -186,6 +192,7 @@ export function useDashboardMetrics() {
         lowScoreAudits,
         incompleteDeployments: [],
         stageDistribution,
+        projectsByStage,
         recentActivity,
       };
     },

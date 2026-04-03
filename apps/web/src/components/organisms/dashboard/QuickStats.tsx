@@ -112,17 +112,28 @@ function DetailsModal({ type, metrics, stageDistribution, onClose }: DetailsModa
       case "healthy":
         const healthyStages = stageDistribution.filter(s => s.stage === "Launched" || s.stage === "Live");
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-3">Projects in Launched or Live stage:</p>
-            {healthyStages.length > 0 ? healthyStages.map((s) => (
-              <div key={s.stage} className="flex justify-between items-center py-1.5 border-b border-border/50">
-                <span className="text-sm flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-status-healthy" />
-                  {s.stage}
-                </span>
-                <span className="text-sm font-mono font-medium">{s.count}</span>
-              </div>
-            )) : (
+            {healthyStages.length > 0 ? (
+              <>
+                {healthyStages.map((s) => (
+                  <div key={s.stage} className="mb-3">
+                    <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+                      <span className="text-sm font-medium flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-status-healthy" />
+                        {s.stage}
+                      </span>
+                      <span className="text-sm font-mono font-medium">{s.count}</span>
+                    </div>
+                    <div className="pl-6 pt-2 space-y-1">
+                      {(metrics.projectsByStage[s.stage] || []).map((p) => (
+                        <p key={p.id} className="text-xs text-muted-foreground">• {p.name}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
               <p className="text-sm text-muted-foreground italic">No projects in Launched or Live stage yet.</p>
             )}
           </div>
@@ -173,17 +184,28 @@ function DetailsModal({ type, metrics, stageDistribution, onClose }: DetailsModa
       case "pipeline":
         const pipelineStages = stageDistribution.filter(s => s.stage === "Dev Ready" || s.stage === "Soft Launch");
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-3">Projects ready for deployment (Dev Ready or Soft Launch):</p>
-            {pipelineStages.length > 0 ? pipelineStages.map((s) => (
-              <div key={s.stage} className="flex justify-between items-center py-1.5 border-b border-border/50">
-                <span className="text-sm flex items-center gap-2">
-                  <Rocket className="h-4 w-4 text-pillar-business" />
-                  {s.stage}
-                </span>
-                <span className="text-sm font-mono font-medium">{s.count}</span>
-              </div>
-            )) : (
+            {pipelineStages.length > 0 ? (
+              <>
+                {pipelineStages.map((s) => (
+                  <div key={s.stage} className="mb-3">
+                    <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+                      <span className="text-sm font-medium flex items-center gap-2">
+                        <Rocket className="h-4 w-4 text-pillar-business" />
+                        {s.stage}
+                      </span>
+                      <span className="text-sm font-mono font-medium">{s.count}</span>
+                    </div>
+                    <div className="pl-6 pt-2 space-y-1">
+                      {(metrics.projectsByStage[s.stage] || []).map((p) => (
+                        <p key={p.id} className="text-xs text-muted-foreground">• {p.name}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
               <p className="text-sm text-muted-foreground italic">No projects in deployment pipeline yet.</p>
             )}
           </div>
