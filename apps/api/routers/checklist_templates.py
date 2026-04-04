@@ -138,6 +138,16 @@ async def delete_template(
 
 # --- Template Items ---
 
+@router.post("/{template_id}/items/bulk", response_model=list[ChecklistTemplateItemResponse], status_code=201)
+async def bulk_add_template_items(
+    template_id: UUID,
+    body: list[ChecklistTemplateItemCreate],
+    user: CurrentUser = None,
+    service: ChecklistTemplateService = Depends(get_service),
+):
+    return await service.bulk_add_items(template_id, [item.model_dump() for item in body])
+
+
 @router.post("/{template_id}/items", response_model=ChecklistTemplateItemResponse, status_code=201)
 async def add_template_item(
     template_id: UUID,

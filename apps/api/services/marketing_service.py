@@ -150,6 +150,13 @@ class MarketingService:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def delete_credential(self, credential_id: UUID) -> None:
+        credential = await self.session.get(MarketingCredential, credential_id)
+        if not credential:
+            raise not_found("Credential")
+        await self.session.delete(credential)
+        await self.session.flush()
+
     async def auto_populate(
         self, data: AutoPopulateRequest, user_id: UUID
     ) -> dict:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,6 +28,8 @@ export type MarketingTaskFormValues = z.infer<typeof schema>;
 
 interface AssigneeOption { value: string; label: string }
 
+interface ChecklistOption { value: string; label: string }
+
 interface AddMarketingTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,11 +37,14 @@ interface AddMarketingTaskDialogProps {
   isLoading?: boolean;
   assigneeOptions?: AssigneeOption[];
   isSubtask?: boolean;
+  prefillTitle?: string;
+  checklistOptions?: ChecklistOption[];
 }
 
 export function AddMarketingTaskDialog({
-  open, onOpenChange, onSubmit, isLoading, assigneeOptions = [], isSubtask = false,
+  open, onOpenChange, onSubmit, isLoading, assigneeOptions = [], isSubtask = false, prefillTitle, checklistOptions = [],
 }: AddMarketingTaskDialogProps) {
+  const [linkedChecklist, setLinkedChecklist] = useState("");
   const defaults: MarketingTaskFormValues = { title: "", description: "", assignee_id: "", due_date: "" };
 
   const {
@@ -51,9 +56,11 @@ export function AddMarketingTaskDialog({
   });
 
   useEffect(() => {
-    if (!open) reset(defaults);
+    if (open) {
+      reset({ ...defaults, title: prefillTitle || "" });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, reset]);
+  }, [open, reset, prefillTitle]);
 
   const currentAssignee = watch("assignee_id");
 
@@ -84,6 +91,27 @@ export function AddMarketingTaskDialog({
             <BaseTextarea id="mkt-desc" placeholder="Task details..." className="resize-y" rows={8} {...register("description")} aria-invalid={!!errors.description} />
             {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
           </div>
+
+          {checklistOptions.length > 0 && (
+            <SearchableSelect
+              label="Linked GTM Checklist Item"
+              placeholder="Select checklist item..."
+              options={checklistOptions}
+              value={linkedChecklist}
+              onValueChange={(v) => {
+                setLinkedChecklist(v);
+                if (v) {
+                  const item = checklistOptions.find((o) => o.value === v);
+                  if (item && !watch("title")) {
+                    const titleOnly = item.label.replace(/\s*\([^)]*\)\s*$/, "");
+                    setValue("title", titleOnly);
+                  }
+                }
+              }}
+              allowClear
+              clearLabel="No linked item"
+            />
+          )}
 
           <SearchableSelect
             label="Assigned To"

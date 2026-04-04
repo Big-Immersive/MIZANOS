@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Skeleton } from "@/components/atoms/display/Skeleton";
 import { Button } from "@/components/molecules/buttons/Button";
@@ -11,6 +11,7 @@ import { MarketingTaskRow } from "./MarketingTaskRow";
 import { toKanbanTask } from "@/components/organisms/kanban/kanban-utils";
 import { useMarketingTasks } from "@/hooks/queries/useMarketingTasks";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
+import { useProjectChecklists } from "@/hooks/queries/useProjectChecklists";
 import {
   useCreateMarketingTask,
   useUpdateMarketingTask,
@@ -20,12 +21,17 @@ import { MARKETING_TASK_STATUS_DISPLAY, MARKETING_TASK_STATUSES } from "@/lib/co
 import type { KanbanTask, MarketingTaskStatus } from "@/lib/types";
 import { ListTodo, Plus } from "lucide-react";
 
-interface MarketingTasksSectionProps { productId: string }
+interface MarketingTasksSectionProps {
+  productId: string;
+  prefillTitle?: string;
+  onPrefillConsumed?: () => void;
+}
 type FilterStatus = MarketingTaskStatus | "all";
 
-function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
+function MarketingTasksSection({ productId, prefillTitle, onPrefillConsumed }: MarketingTasksSectionProps) {
   const { data: tasks, isLoading } = useMarketingTasks(productId);
   const { data: members = [] } = useProductMembers(productId);
+  const { data: gtmChecklists = [] } = useProjectChecklists(productId, "gtm");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [editTask, setEditTask] = useState<KanbanTask | null>(null);
@@ -34,6 +40,12 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
   const createTask = useCreateMarketingTask(productId);
   const updateTask = useUpdateMarketingTask(productId);
   const deleteTask = useDeleteMarketingTask(productId);
+
+  useEffect(() => {
+    if (prefillTitle) {
+      setAddOpen(true);
+    }
+  }, [prefillTitle]);
 
   const assigneeMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -57,6 +69,12 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
       })),
     ];
   }, [members]);
+
+  const checklistOptions = useMemo(() => {
+    return gtmChecklists.flatMap((cl) =>
+      cl.items.map((item) => ({ value: item.id, label: `${item.title} (${item.category})` }))
+    );
+  }, [gtmChecklists]);
 
   const filtered = useMemo(() => {
     if (!tasks) return [];
@@ -92,8 +110,8 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
           <h3 className="text-lg font-medium mb-2">No Marketing Tasks</h3>
           <p className="text-sm text-muted-foreground mb-4">Create the first marketing task for this project.</p>
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add Task</Button>
-          <AddMarketingTaskDialog open={addOpen} onOpenChange={setAddOpen} isLoading={createTask.isPending} assigneeOptions={assigneeOptions}
-            onSubmit={(data) => { createTask.mutate(data, { onSuccess: () => setAddOpen(false) }); }} />
+          <AddMarketingTaskDialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) onPrefillConsumed?.(); }} isLoading={createTask.isPending} assigneeOptions={assigneeOptions}
+            checklistOptions={checklistOptions} prefillTitle={prefillTitle} onSubmit={(data) => { createTask.mutate(data, { onSuccess: () => { setAddOpen(false); onPrefillConsumed?.(); } }); }} />
         </CardContent>
       </Card>
     );

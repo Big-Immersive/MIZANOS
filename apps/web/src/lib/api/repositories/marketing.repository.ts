@@ -79,6 +79,34 @@ export class MarketingRepository {
     return response.data;
   }
 
+  async createCredential(data: {
+    product_id: string;
+    created_by: string;
+    label: string;
+    credential_type: string;
+    username?: string;
+    email?: string;
+    password?: string;
+    additional_info?: string;
+  }): Promise<MarketingCredential> {
+    const response = await this.client.post<MarketingCredential>(
+      `${this.basePath}/credentials`,
+      data,
+    );
+    return response.data;
+  }
+
+  async deleteCredential(credentialId: string): Promise<void> {
+    await this.client.delete(`${this.basePath}/credentials/${credentialId}`);
+  }
+
+  async decryptCredential(credentialId: string): Promise<{ id: string; password: string | null }> {
+    const response = await this.client.get<{ id: string; password: string | null }>(
+      `${this.basePath}/credentials/${credentialId}/decrypt`,
+    );
+    return response.data;
+  }
+
   async getChecklists(productId: string): Promise<MarketingChecklistItem[]> {
     const response = await this.client.get<MarketingChecklistItem[]>(
       `${this.basePath}/checklist`,

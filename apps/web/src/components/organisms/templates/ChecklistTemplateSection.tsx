@@ -113,15 +113,14 @@ export function ChecklistTemplateSection() {
       {!isLoading && templates && templates.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {templates.map((t) => (
-            <Card key={t.id} className="hover:border-primary/30 transition-colors">
+            <Link key={t.id} href={`/templates/checklist/${t.id}`} className="block">
+            <Card className="hover:border-primary/30 transition-colors cursor-pointer">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <Link href={`/templates/checklist/${t.id}`}>
-                    <CardTitle className="text-sm hover:text-primary cursor-pointer">{t.name}</CardTitle>
-                  </Link>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => handleEdit(t)} className="p-1 rounded hover:bg-accent"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
-                    <button onClick={() => deleteTemplate.mutate(t.id)} className="p-1 rounded hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" /></button>
+                  <CardTitle className="text-sm hover:text-primary">{t.name}</CardTitle>
+                  <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
+                    <button onClick={(e) => { e.preventDefault(); handleEdit(t); }} className="p-1 rounded hover:bg-accent"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                    <button onClick={(e) => { e.preventDefault(); deleteTemplate.mutate(t.id); }} className="p-1 rounded hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" /></button>
                   </div>
                 </div>
               </CardHeader>
@@ -134,6 +133,7 @@ export function ChecklistTemplateSection() {
                 </div>
               </CardContent>
             </Card>
+            </Link>
           ))}
         </div>
       )}

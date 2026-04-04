@@ -37,9 +37,10 @@ export function SearchableSelect({
 
   const selectedLabel = options.find((o) => o.value === value)?.label;
 
+  const deduped = options.filter((o, i, arr) => arr.findIndex((x) => x.value === o.value) === i);
   const filtered = search
-    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
-    : options;
+    ? deduped.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+    : deduped;
 
   const handleSelect = (val: string) => {
     onValueChange(val === value ? "" : val);

@@ -184,6 +184,14 @@ class ProductService(BaseService[Product]):
             )
             self.repo.session.add(member)
             await self.repo.session.flush()
+
+        # Auto-apply all active QA templates to the new project
+        from apps.api.services.checklist_template_service import ChecklistTemplateService
+        checklist_svc = ChecklistTemplateService(self.repo.session)
+        await checklist_svc.auto_apply_qa_templates_to_project(
+            created.id, user.profile_id,
+        )
+
         return created
 
     async def update(self, entity_id: UUID, data: dict) -> Product:

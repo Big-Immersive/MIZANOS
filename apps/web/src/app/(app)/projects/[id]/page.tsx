@@ -160,7 +160,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           </div>
         }
         environmentsContent={<EnvironmentsTab productId={id} />}
-        marketingContent={<MarketingTab productId={id} />}
+        marketingContent={<MarketingTab productId={id} canViewCredentials />}
         qaContent={<QAChecklistTab productId={id} />}
         sourcesContent={<SourcesTab productId={id} />}
       />

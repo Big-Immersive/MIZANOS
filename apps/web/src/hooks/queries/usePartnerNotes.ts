@@ -41,7 +41,7 @@ export function usePartnerNoteMutations(productId: string) {
       productsRepository.createPartnerNote(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: key });
-      toast.success("Partner note added");
+      toast.success("Release note added");
     },
     onError: (error: Error) => {
       toast.error("Failed to add note: " + error.message);

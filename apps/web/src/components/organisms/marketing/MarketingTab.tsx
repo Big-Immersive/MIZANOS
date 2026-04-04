@@ -33,6 +33,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function MarketingTab({ productId, canViewCredentials = false }: MarketingTabProps) {
   const [activeTab, setActiveTab] = useState<TabId>("tasks");
+  const [prefillTaskTitle, setPrefillTaskTitle] = useState("");
   const { data: domains, isLoading: domainsLoading } = useMarketingDomains(productId);
   const { data: socialHandles, isLoading: socialsLoading } = useMarketingSocialHandles(productId);
   const { data: credentials, isLoading: credentialsLoading } = useMarketingCredentials(productId);
@@ -74,7 +75,7 @@ export function MarketingTab({ productId, canViewCredentials = false }: Marketin
       ) : (
         <div className="min-h-[200px]">
           {activeTab === "tasks" && (
-            <MarketingTasksSection productId={productId} />
+            <MarketingTasksSection productId={productId} prefillTitle={prefillTaskTitle} onPrefillConsumed={() => setPrefillTaskTitle("")} />
           )}
           {activeTab === "domains" && (
             <DomainsSection domains={domains ?? []} productId={productId} />
@@ -89,7 +90,12 @@ export function MarketingTab({ productId, canViewCredentials = false }: Marketin
             <>
               <ChecklistSection items={checklistItems ?? []} productId={productId} />
               <div className="mt-6">
-                <ProjectChecklistView productId={productId} checklistType="gtm" title="GTM Checklists" />
+                <ProjectChecklistView
+                productId={productId}
+                checklistType="gtm"
+                title="GTM Checklists"
+                onCreateTaskFromItem={(title) => { setPrefillTaskTitle(title); setActiveTab("tasks"); }}
+              />
               </div>
             </>
           )}
