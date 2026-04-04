@@ -46,6 +46,11 @@ class ChecklistTemplateService:
         self.session.add(t)
         await self.session.flush()
         await self.session.refresh(t)
+
+        # Auto-apply QA and Development templates to all existing projects
+        if t.template_type in ("qa", "development"):
+            await self._auto_apply_to_all_projects(t, created_by)
+
         return t
 
     async def update_template(self, template_id: UUID, **updates) -> ChecklistTemplate:
@@ -70,15 +75,38 @@ class ChecklistTemplateService:
             select(func.coalesce(func.max(ChecklistTemplateItem.sort_order), -1))
             .where(ChecklistTemplateItem.template_id == template_id)
         )
+        next_order = (max_order.scalar_one() or 0) + 1
         item = ChecklistTemplateItem(
             template_id=template_id,
-            sort_order=data.get("sort_order", (max_order.scalar_one() or 0) + 1),
+            sort_order=next_order,
             **{k: v for k, v in data.items() if k != "sort_order"},
         )
         self.session.add(item)
         await self.session.flush()
         await self.session.refresh(item)
         return item
+
+    async def bulk_add_items(self, template_id: UUID, items_data: list[dict]) -> list[ChecklistTemplateItem]:
+        await self.get_template(template_id)
+        max_result = await self.session.execute(
+            select(func.coalesce(func.max(ChecklistTemplateItem.sort_order), -1))
+            .where(ChecklistTemplateItem.template_id == template_id)
+        )
+        sort_order = (max_result.scalar_one() or 0) + 1
+        created: list[ChecklistTemplateItem] = []
+        for data in items_data:
+            item = ChecklistTemplateItem(
+                template_id=template_id,
+                sort_order=data.get("sort_order", sort_order),
+                **{k: v for k, v in data.items() if k != "sort_order"},
+            )
+            self.session.add(item)
+            created.append(item)
+            sort_order += 1
+        await self.session.flush()
+        for item in created:
+            await self.session.refresh(item)
+        return created
 
     async def update_item(self, item_id: UUID, **updates) -> ChecklistTemplateItem:
         item = await self.session.get(ChecklistTemplateItem, item_id)
@@ -138,6 +166,38 @@ class ChecklistTemplateService:
         await self.session.flush()
         await self.session.refresh(checklist)
         return checklist
+
+    # --- Auto-apply ---
+
+    async def _auto_apply_to_all_projects(
+        self, template: ChecklistTemplate, created_by: UUID | None = None,
+    ) -> None:
+        """Apply a template to every project that doesn't already have it."""
+        from apps.api.models.product import Product
+
+        products = list((await self.session.execute(select(Product))).scalars().all())
+        existing = set(
+            row[0] for row in (await self.session.execute(
+                select(ProjectChecklist.product_id).where(
+                    ProjectChecklist.template_id == template.id
+                )
+            )).all()
+        )
+        for p in products:
+            if p.id not in existing:
+                await self.apply_template(template.id, p.id, created_by)
+
+    async def auto_apply_qa_templates_to_project(
+        self, product_id: UUID, created_by: UUID | None = None,
+    ) -> None:
+        """Apply all active QA and Development templates to a newly created project."""
+        stmt = select(ChecklistTemplate).where(
+            ChecklistTemplate.template_type.in_(["qa", "development"]),
+            ChecklistTemplate.is_active == True,
+        )
+        templates = list((await self.session.execute(stmt)).scalars().all())
+        for t in templates:
+            await self.apply_template(t.id, product_id, created_by)
 
     # --- Categories ---
 

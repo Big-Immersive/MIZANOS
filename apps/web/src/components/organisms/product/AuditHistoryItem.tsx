@@ -98,9 +98,10 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="border rounded-lg overflow-hidden">
         <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="w-full flex items-center justify-between p-4 h-auto hover:bg-secondary/50"
+          <div
+            role="button"
+            tabIndex={0}
+            className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-secondary/50 transition-colors"
           >
             <div className="flex items-center gap-4">
               <HealthScore score={Math.round(audit.overall_score * 10) / 10} size="sm" showLabel={false} />
@@ -151,7 +152,7 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
                 <ChevronDown className="h-4 w-4" />
               )}
             </div>
-          </Button>
+          </div>
         </CollapsibleTrigger>
 
         <CollapsibleContent>

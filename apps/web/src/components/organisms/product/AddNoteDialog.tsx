@@ -52,7 +52,7 @@ function AddNoteDialog({
   };
 
   const title =
-    type === "management" ? "Add Management Note" : "Add Partner Note";
+    type === "management" ? "Add Management Note" : "Add Release Note";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,24 +63,24 @@ function AddNoteDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {type === "partner" && (
             <div>
-              <BaseLabel htmlFor="partner-name">Partner Name</BaseLabel>
+              <BaseLabel htmlFor="partner-name">Title</BaseLabel>
               <BaseInput
                 id="partner-name"
                 value={partnerName}
                 onChange={(e) => setPartnerName(e.target.value)}
                 required
-                placeholder="Client or partner name"
+                placeholder="Release note title"
               />
             </div>
           )}
           <div>
-            <BaseLabel htmlFor="note-content">Note</BaseLabel>
+            <BaseLabel htmlFor="note-content">{type === "partner" ? "Description" : "Note"}</BaseLabel>
             <BaseTextarea
               id="note-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               required
-              placeholder="Enter your note..."
+              placeholder={type === "partner" ? "Release note description..." : "Enter your note..."}
               rows={4}
             />
           </div>

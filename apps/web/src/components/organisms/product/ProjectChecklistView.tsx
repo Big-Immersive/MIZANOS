@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
 import { Button } from "@/components/molecules/buttons/Button";
@@ -20,15 +20,19 @@ import {
 } from "@/hooks/mutations/useProjectChecklistMutations";
 import { CHECKLIST_STATUS_LABELS } from "@/lib/types/checklist-template";
 import type { ProjectChecklist, ProjectChecklistItem } from "@/lib/types/checklist-template";
-import { CheckSquare, ListChecks, Plus, Trash2, User } from "lucide-react";
+import { CheckSquare, ListChecks, Plus, Trash2 } from "lucide-react";
+import { useCreateMarketingTask } from "@/hooks/mutations/useMarketingTaskMutations";
+import { ChecklistItemRow } from "./ChecklistItemRow";
+import { toast } from "sonner";
 
 interface ProjectChecklistViewProps {
   productId: string;
   checklistType: string;
   title?: string;
+  onCreateTaskFromItem?: (title: string) => void;
 }
 
-export function ProjectChecklistView({ productId, checklistType, title }: ProjectChecklistViewProps) {
+export function ProjectChecklistView({ productId, checklistType, title, onCreateTaskFromItem }: ProjectChecklistViewProps) {
   const { data: checklists, isLoading } = useProjectChecklists(productId, checklistType);
   const { data: templates = [] } = useChecklistTemplates(checklistType);
   const { data: profiles = [] } = useProfiles();
@@ -37,9 +41,9 @@ export function ProjectChecklistView({ productId, checklistType, title }: Projec
   const updateItem = useUpdateProjectChecklistItem(productId);
   const deleteItem = useDeleteProjectChecklistItem(productId);
   const addItem = useAddProjectChecklistItem(productId);
+  const createTask = useCreateMarketingTask(productId);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [showAddItem, setShowAddItem] = useState<string | null>(null);
-  const [newItemTitle, setNewItemTitle] = useState("");
 
   if (isLoading) return <Skeleton className="h-48" />;
 
@@ -111,44 +115,110 @@ export function ProjectChecklistView({ productId, checklistType, title }: Projec
           </div>
 
           {checklists!.map((cl) => (
-            <ChecklistCard
-              key={cl.id}
-              checklist={cl}
-              profiles={profiles}
-              onUpdateItem={(itemId, data) => updateItem.mutate({ itemId, ...data })}
-              onDeleteItem={(itemId) => deleteItem.mutate(itemId)}
-              onDeleteChecklist={() => deleteChecklist.mutate(cl.id)}
-              showAddItem={showAddItem === cl.id}
-              onToggleAddItem={() => setShowAddItem(showAddItem === cl.id ? null : cl.id)}
-              newItemTitle={newItemTitle}
-              onNewItemTitleChange={setNewItemTitle}
-              onAddItem={() => {
-                if (!newItemTitle.trim()) return;
-                addItem.mutate({ checklistId: cl.id, title: newItemTitle.trim() });
-                setNewItemTitle("");
-              }}
-            />
-          ))}
+              <ChecklistWithAddForm
+                key={cl.id}
+                checklist={cl}
+                profiles={profiles}
+                isAdding={showAddItem === cl.id}
+                updateItem={updateItem}
+                deleteItem={deleteItem}
+                deleteChecklist={deleteChecklist}
+                addItem={addItem}
+                createTask={createTask}
+                onCreateTaskFromItem={onCreateTaskFromItem}
+                onShowAdd={() => setShowAddItem(showAddItem === cl.id ? null : cl.id)}
+                onHideAdd={() => setShowAddItem(null)}
+              />
+            ))}
         </>
       )}
     </div>
   );
 }
 
-function ChecklistCard({
-  checklist, profiles, onUpdateItem, onDeleteItem, onDeleteChecklist,
-  showAddItem, onToggleAddItem, newItemTitle, onNewItemTitleChange, onAddItem,
+function ChecklistWithAddForm({
+  checklist, profiles, isAdding, updateItem, deleteItem, deleteChecklist, addItem, createTask, onCreateTaskFromItem, onShowAdd, onHideAdd,
+}: {
+  checklist: ProjectChecklist;
+  profiles: Array<{ id: string; full_name?: string | null; email?: string | null }>;
+  isAdding: boolean;
+  updateItem: { mutate: (data: { itemId: string } & Record<string, unknown>) => void };
+  deleteItem: { mutate: (id: string) => void };
+  deleteChecklist: { mutate: (id: string) => void };
+  addItem: { mutate: (data: { checklistId: string; title: string; category: string; status: string }) => void };
+  createTask: { mutate: (data: { title: string; status: string }, opts?: { onSuccess?: () => void }) => void };
+  onCreateTaskFromItem?: (title: string) => void;
+  onShowAdd: () => void;
+  onHideAdd: () => void;
+}) {
+  const [newItemTitle, setNewItemTitle] = useState("");
+  const [newItemCategory, setNewItemCategory] = useState("general");
+  const [newItemStatus, setNewItemStatus] = useState("new");
+
+  const existingCats = [...new Set(checklist.items.map((i) => i.category || "general"))];
+  const categoryOptions = ["general", ...existingCats].filter((v, i, a) => a.indexOf(v) === i);
+
+  const handleAdd = useCallback(() => {
+    if (!newItemTitle.trim()) return;
+    addItem.mutate({ checklistId: checklist.id, title: newItemTitle.trim(), category: newItemCategory, status: newItemStatus });
+    setNewItemTitle(""); setNewItemCategory("general"); setNewItemStatus("new");
+  }, [newItemTitle, newItemCategory, newItemStatus, addItem, checklist.id]);
+
+  return (
+    <div className="space-y-2">
+      {isAdding && (
+        <Card className="border-primary/30">
+          <CardContent className="p-3 space-y-2">
+            <input
+              type="text" value={newItemTitle}
+              onChange={(e) => setNewItemTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+                if (e.key === "Escape") onHideAdd();
+              }}
+              placeholder="Checklist item title..." autoFocus
+              className="w-full h-8 px-2 text-sm rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <div className="flex items-center gap-2">
+              <Select value={newItemCategory} onValueChange={setNewItemCategory}>
+                <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Category" /></SelectTrigger>
+                <SelectContent>{categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={newItemStatus} onValueChange={setNewItemStatus}>
+                <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(CHECKLIST_STATUS_LABELS).map(([v, l]) => <SelectItem key={v} value={v} className="text-xs">{l}</SelectItem>)}</SelectContent>
+              </Select>
+              <Button size="sm" onClick={handleAdd} disabled={!newItemTitle.trim()}>Add</Button>
+              <Button size="sm" variant="outline" onClick={onHideAdd}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      <ChecklistCard
+        checklist={checklist} profiles={profiles}
+        onUpdateItem={(itemId, data) => updateItem.mutate({ itemId, ...data })}
+        onDeleteItem={(itemId) => deleteItem.mutate(itemId)}
+        onDeleteChecklist={() => deleteChecklist.mutate(checklist.id)}
+        onCreateTask={(itemTitle) => {
+          if (onCreateTaskFromItem) { onCreateTaskFromItem(itemTitle); }
+          else { createTask.mutate({ title: itemTitle, status: "planned" }, { onSuccess: () => toast.success("Marketing task created: " + itemTitle) }); }
+        }}
+        onToggleAddItem={onShowAdd}
+      />
+    </div>
+  );
+}
+
+const ChecklistCard = memo(function ChecklistCard({
+  checklist, profiles, onUpdateItem, onDeleteItem, onDeleteChecklist, onCreateTask, onToggleAddItem,
 }: {
   checklist: ProjectChecklist;
   profiles: Array<{ id: string; full_name?: string | null; email?: string | null }>;
   onUpdateItem: (itemId: string, data: Record<string, unknown>) => void;
   onDeleteItem: (itemId: string) => void;
   onDeleteChecklist: () => void;
-  showAddItem: boolean;
+  onCreateTask: (title: string) => void;
   onToggleAddItem: () => void;
-  newItemTitle: string;
-  onNewItemTitleChange: (v: string) => void;
-  onAddItem: () => void;
 }) {
   const completed = checklist.completed_count;
   const total = checklist.item_count;
@@ -175,100 +245,37 @@ function ChecklistCard({
           <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
         </div>
       </CardHeader>
-      <CardContent className="space-y-1 pt-0">
-        {checklist.items.map((item) => (
-          <ChecklistItemRow
-            key={item.id}
-            item={item}
-            profiles={profiles}
-            onUpdate={(data) => onUpdateItem(item.id, data)}
-            onDelete={() => onDeleteItem(item.id)}
-          />
-        ))}
-        {showAddItem && (
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              type="text"
-              value={newItemTitle}
-              onChange={(e) => onNewItemTitleChange(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") onAddItem(); }}
-              placeholder="New checklist item..."
-              className="flex-1 h-8 px-2 text-sm rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-              autoFocus
-            />
-            <Button size="sm" onClick={onAddItem} disabled={!newItemTitle.trim()}>Add</Button>
-          </div>
-        )}
+      <CardContent className="space-y-3 pt-0">
+        {(() => {
+          const grouped: Record<string, typeof checklist.items> = {};
+          for (const item of checklist.items) {
+            const cat = item.category || "general";
+            (grouped[cat] ??= []).push(item);
+          }
+          return Object.entries(grouped).map(([category, items]) => {
+            const done = items.filter((i) => i.status === "complete").length;
+            return (
+              <div key={category} className="space-y-0.5">
+                <div className="flex items-center gap-2 py-1.5 border-b border-border">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{category}</h4>
+                  <Badge variant="outline" className="text-[9px]">{done}/{items.length}</Badge>
+                </div>
+                {items.map((item) => (
+                  <ChecklistItemRow
+                    key={item.id}
+                    item={item}
+                    profiles={profiles}
+                    onUpdate={(data) => onUpdateItem(item.id, data)}
+                    onDelete={() => onDeleteItem(item.id)}
+                    onCreateTask={() => onCreateTask(item.title)}
+                  />
+                ))}
+              </div>
+            );
+          });
+        })()}
       </CardContent>
     </Card>
   );
-}
+});
 
-function ChecklistItemRow({
-  item, profiles, onUpdate, onDelete,
-}: {
-  item: ProjectChecklistItem;
-  profiles: Array<{ id: string; full_name?: string | null; email?: string | null }>;
-  onUpdate: (data: Record<string, unknown>) => void;
-  onDelete: () => void;
-}) {
-  const isComplete = item.status === "complete";
-
-  return (
-    <div className="flex items-center gap-2 group rounded-md px-2 py-1.5 hover:bg-accent/50 transition-colors">
-      <span className={`flex-1 text-sm ${isComplete ? "line-through text-muted-foreground" : ""}`}>
-        {item.title}
-      </span>
-
-      {item.category !== "general" && (
-        <Badge variant="outline" className="text-[9px] shrink-0">{item.category}</Badge>
-      )}
-
-      {item.assignee_name && (
-        <span className="flex items-center gap-1 text-[10px] text-muted-foreground shrink-0">
-          <User className="h-2.5 w-2.5" /> {item.assignee_name}
-        </span>
-      )}
-
-      {item.due_date && (
-        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-          {new Date(item.due_date).toLocaleDateString()}
-        </span>
-      )}
-
-      <Select value={item.status} onValueChange={(v) => onUpdate({ status: v })}>
-        <SelectTrigger className="h-6 w-[100px] text-[10px] border-muted shrink-0">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(CHECKLIST_STATUS_LABELS).map(([val, label]) => (
-            <SelectItem key={val} value={val} className="text-xs">{label}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={item.assignee_id ?? "__none__"}
-        onValueChange={(v) => onUpdate({ assignee_id: v === "__none__" ? null : v })}
-      >
-        <SelectTrigger className="h-6 w-6 p-0 border-0 bg-transparent [&>svg]:hidden opacity-0 group-hover:opacity-100 shrink-0">
-          <User className="h-3 w-3 text-muted-foreground" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">Unassigned</SelectItem>
-          {profiles.map((p) => (
-            <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email ?? "Unknown"}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <button
-        type="button"
-        onClick={onDelete}
-        className="p-0.5 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-      >
-        <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-      </button>
-    </div>
-  );
-}

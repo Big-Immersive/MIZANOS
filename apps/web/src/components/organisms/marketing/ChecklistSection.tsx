@@ -140,25 +140,7 @@ export function ChecklistSection({ items, productId }: ChecklistSectionProps) {
   };
 
   if (items.length === 0) {
-    return (
-      <div className="text-center py-8 space-y-4">
-        <CheckSquare className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground">No checklist items yet</p>
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => applyTemplate.mutate("product_hunt")}
-          disabled={applyTemplate.isPending}
-        >
-          {applyTemplate.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Rocket className="h-4 w-4 mr-2" />
-          )}
-          Apply Product Hunt Checklist
-        </Button>
-      </div>
-    );
+    return null;
   }
 
   const totalCompleted = items.filter((i) => i.is_completed).length;

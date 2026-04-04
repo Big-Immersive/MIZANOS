@@ -141,16 +141,7 @@ function DocumentUpload({
       );
 
       try {
-        await uploadMutation.mutateAsync({
-          file_name: item.file.name,
-          file_path: `uploads/${productId}/${item.file.name}`,
-          file_size: item.file.size,
-          file_type: item.file.type || "application/octet-stream",
-          category: item.category,
-          description: item.description || null,
-          folder_id: folderId ?? null,
-          uploaded_by: user?.profile_id ?? user?.id ?? "",
-        });
+        await uploadMutation.mutateAsync(item.file);
 
         setQueue((prev) =>
           prev.map((q, idx) =>

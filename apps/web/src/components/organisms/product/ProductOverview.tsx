@@ -203,13 +203,13 @@ function ProductOverview({ productId }: ProductOverviewProps) {
           {canViewManagementNotes && (
             <ManagementNotes
               productId={productId}
-              authorId={user?.id ?? ""}
+              authorId={user?.profile_id ?? user?.id ?? ""}
             />
           )}
           {canViewPartnerNotes && (
             <PartnerNotes
               productId={productId}
-              authorId={user?.id ?? ""}
+              authorId={user?.profile_id ?? user?.id ?? ""}
             />
           )}
         </div>

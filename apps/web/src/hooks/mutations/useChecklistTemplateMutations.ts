@@ -43,6 +43,16 @@ export function useAddChecklistTemplateItem(templateId: string) {
   });
 }
 
+export function useBulkAddChecklistTemplateItems(templateId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ title: string; category?: string; default_status?: string }>) =>
+      checklistTemplatesRepository.bulkAddItems(templateId, items),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["checklist-templates", templateId] }); toast.success("Items added"); },
+    onError: (e: Error) => toast.error("Failed: " + e.message),
+  });
+}
+
 export function useUpdateChecklistTemplateItem(templateId: string) {
   const qc = useQueryClient();
   return useMutation({

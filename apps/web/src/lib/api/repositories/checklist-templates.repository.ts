@@ -35,6 +35,11 @@ class ChecklistTemplatesRepository {
     return response.data;
   }
 
+  async bulkAddItems(templateId: string, items: Array<{ title: string; category?: string; default_status?: string }>): Promise<ChecklistTemplateItem[]> {
+    const response = await apiClient.post<ChecklistTemplateItem[]>(`${this.basePath}/${templateId}/items/bulk`, items);
+    return response.data;
+  }
+
   async updateItem(templateId: string, itemId: string, data: Partial<ChecklistTemplateItem>): Promise<ChecklistTemplateItem> {
     const response = await apiClient.patch<ChecklistTemplateItem>(`${this.basePath}/${templateId}/items/${itemId}`, data);
     return response.data;

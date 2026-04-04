@@ -1,39 +1,51 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Skeleton } from "@/components/atoms/display/Skeleton";
 import { Button } from "@/components/molecules/buttons/Button";
 import { SearchableSelect } from "@/components/molecules/forms/SearchableSelect";
-import { TaskDetailDrawer } from "@/components/organisms/product/TaskDetailDrawer";
+import { MarketingTaskDrawer } from "./MarketingTaskDrawer";
 import { AddMarketingTaskDialog } from "./AddMarketingTaskDialog";
 import { MarketingTaskRow } from "./MarketingTaskRow";
-import { toKanbanTask } from "@/components/organisms/kanban/kanban-utils";
 import { useMarketingTasks } from "@/hooks/queries/useMarketingTasks";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
+import { useProjectChecklists } from "@/hooks/queries/useProjectChecklists";
 import {
   useCreateMarketingTask,
   useUpdateMarketingTask,
   useDeleteMarketingTask,
 } from "@/hooks/mutations/useMarketingTaskMutations";
 import { MARKETING_TASK_STATUS_DISPLAY, MARKETING_TASK_STATUSES } from "@/lib/constants";
-import type { KanbanTask, MarketingTaskStatus } from "@/lib/types";
+import type { Task, MarketingTaskStatus } from "@/lib/types";
 import { ListTodo, Plus } from "lucide-react";
 
-interface MarketingTasksSectionProps { productId: string }
+interface MarketingTasksSectionProps {
+  productId: string;
+  prefillTitle?: string;
+  onPrefillConsumed?: () => void;
+}
 type FilterStatus = MarketingTaskStatus | "all";
 
-function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
+function MarketingTasksSection({ productId, prefillTitle, onPrefillConsumed }: MarketingTasksSectionProps) {
   const { data: tasks, isLoading } = useMarketingTasks(productId);
   const { data: members = [] } = useProductMembers(productId);
+  const { data: gtmChecklists = [] } = useProjectChecklists(productId, "gtm");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
-  const [editTask, setEditTask] = useState<KanbanTask | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const createTask = useCreateMarketingTask(productId);
   const updateTask = useUpdateMarketingTask(productId);
   const deleteTask = useDeleteMarketingTask(productId);
+
+  useEffect(() => {
+    if (prefillTitle) {
+      setAddOpen(true);
+    }
+  }, [prefillTitle]);
 
   const assigneeMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -58,6 +70,12 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
     ];
   }, [members]);
 
+  const checklistOptions = useMemo(() => {
+    return gtmChecklists.flatMap((cl) =>
+      cl.items.map((item) => ({ value: item.id, label: `${item.title} (${item.category})` }))
+    );
+  }, [gtmChecklists]);
+
   const filtered = useMemo(() => {
     if (!tasks) return [];
     return tasks.filter((t) => {
@@ -77,10 +95,10 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
     return counts;
   }, [tasks]);
 
-  const handleClick = useCallback((task: typeof filtered[number]) => {
-    setEditTask(toKanbanTask(task, assigneeMap));
+  const handleClick = useCallback((task: Task) => {
+    setEditTask(task);
     setEditOpen(true);
-  }, [assigneeMap]);
+  }, []);
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>;
 
@@ -92,8 +110,8 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
           <h3 className="text-lg font-medium mb-2">No Marketing Tasks</h3>
           <p className="text-sm text-muted-foreground mb-4">Create the first marketing task for this project.</p>
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add Task</Button>
-          <AddMarketingTaskDialog open={addOpen} onOpenChange={setAddOpen} isLoading={createTask.isPending} assigneeOptions={assigneeOptions}
-            onSubmit={(data) => { createTask.mutate(data, { onSuccess: () => setAddOpen(false) }); }} />
+          <AddMarketingTaskDialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) onPrefillConsumed?.(); }} isLoading={createTask.isPending} assigneeOptions={assigneeOptions}
+            checklistOptions={checklistOptions} prefillTitle={prefillTitle} onSubmit={(data) => { createTask.mutate(data, { onSuccess: () => { setAddOpen(false); onPrefillConsumed?.(); } }); }} />
         </CardContent>
       </Card>
     );
@@ -134,15 +152,26 @@ function MarketingTasksSection({ productId }: MarketingTasksSectionProps) {
 
       <div className="space-y-2">
         {filtered.map((task) => (
-          <MarketingTaskRow key={task.id} task={task} selected={false} productId={productId}
+          <MarketingTaskRow
+            key={task.id}
+            task={task}
             assigneeName={task.assignee_id ? assigneeMap.get(task.assignee_id) : undefined}
-            assigneeMap={assigneeMap} assigneeOptions={assigneeOptions}
-            onToggle={() => {}} onClick={() => handleClick(task)} />
+            onStatusChange={(status) => updateTask.mutate({ id: task.id, status })}
+            onDelete={() => deleteTask.mutate(task.id)}
+            onClick={() => handleClick(task)}
+          />
         ))}
       </div>
 
-      <TaskDetailDrawer open={editOpen} onOpenChange={setEditOpen} task={editTask} productId={productId}
-        taskType="marketing_task" updateMutation={updateTask} deleteMutation={deleteTask} />
+      <MarketingTaskDrawer
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        task={editTask}
+        assigneeOptions={assigneeOptions}
+        onSave={(data) => { if (editTask) updateTask.mutate({ id: editTask.id, ...data }); }}
+        onDelete={() => { if (editTask) deleteTask.mutate(editTask.id); }}
+        isSaving={updateTask.isPending}
+      />
       <AddMarketingTaskDialog open={addOpen} onOpenChange={setAddOpen} isLoading={createTask.isPending} assigneeOptions={assigneeOptions}
         onSubmit={(data) => { createTask.mutate(data, { onSuccess: () => setAddOpen(false) }); }} />
     </div>

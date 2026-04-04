@@ -21,6 +21,7 @@ import {
   FolderGit2,
   Users,
   Bug,
+  Code2,
 } from "lucide-react";
 
 interface ProductTabConfig {
@@ -43,6 +44,7 @@ interface ProductTabsProps {
   auditContent?: ReactNode;
   deploymentContent?: ReactNode;
   qaContent?: ReactNode;
+  devStandardsContent?: ReactNode;
   environmentsContent?: ReactNode;
   marketingContent?: ReactNode;
   sourcesContent?: ReactNode;
@@ -64,6 +66,7 @@ function ProductTabs({
   auditContent,
   deploymentContent,
   qaContent,
+  devStandardsContent,
   environmentsContent,
   marketingContent,
   sourcesContent,
@@ -125,6 +128,12 @@ function ProductTabs({
       label: "QA",
       icon: <ShieldCheck className="h-4 w-4" />,
       content: qaContent,
+    },
+    {
+      value: "dev-standards",
+      label: "Dev Standards",
+      icon: <Code2 className="h-4 w-4" />,
+      content: devStandardsContent,
     },
     {
       value: "audit",

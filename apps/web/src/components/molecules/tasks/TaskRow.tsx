@@ -24,9 +24,11 @@ interface TaskRowProps {
   onStatusChange?: (taskId: string, status: string) => void;
   statusDisplay?: Record<string, TaskStatusConfig>;
   hideCheckbox?: boolean;
+  hidePriority?: boolean;
+  hideStatusIcon?: boolean;
 }
 
-export function TaskRow({ task, selected, assigneeName, checklistAssignees, onToggle, onClick, onStatusChange, statusDisplay, hideCheckbox }: TaskRowProps) {
+export function TaskRow({ task, selected, assigneeName, checklistAssignees, onToggle, onClick, onStatusChange, statusDisplay, hideCheckbox, hidePriority, hideStatusIcon }: TaskRowProps) {
   const display = statusDisplay ?? TASK_STATUS_DISPLAY;
   const fallbackKey = statusDisplay ? Object.keys(display)[0] : "backlog";
   const statusConfig = display[task.status ?? fallbackKey] ?? display[fallbackKey];
@@ -43,7 +45,7 @@ export function TaskRow({ task, selected, assigneeName, checklistAssignees, onTo
             <BaseCheckbox checked={selected} onCheckedChange={onToggle} />
           </div>
         )}
-        <StatusIcon className={`h-5 w-5 shrink-0 ${statusConfig.color}`} />
+        {!hideStatusIcon && <StatusIcon className={`h-5 w-5 shrink-0 ${statusConfig.color}`} />}
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{task.title}</p>
@@ -53,7 +55,7 @@ export function TaskRow({ task, selected, assigneeName, checklistAssignees, onTo
             </p>
           )}
           <div className="flex items-center gap-2 mt-1.5">
-            {task.priority && (
+            {!hidePriority && task.priority && (
               <Badge
                 variant="secondary"
                 className={`text-[10px] ${TASK_PRIORITY_COLORS[task.priority] ?? ""}`}

@@ -37,9 +37,10 @@ export function SearchableSelect({
 
   const selectedLabel = options.find((o) => o.value === value)?.label;
 
+  const deduped = options.filter((o, i, arr) => arr.findIndex((x) => x.value === o.value) === i);
   const filtered = search
-    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
-    : options;
+    ? deduped.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+    : deduped;
 
   const handleSelect = (val: string) => {
     onValueChange(val === value ? "" : val);
@@ -48,7 +49,7 @@ export function SearchableSelect({
   };
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 min-w-0">
       {label && <label className="text-sm font-medium">{label}</label>}
       <Popover open={open} onOpenChange={setOpen} modal={false}>
         <PopoverTrigger asChild>
@@ -56,7 +57,7 @@ export function SearchableSelect({
             type="button"
             role="combobox"
             aria-expanded={open}
-            className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="flex h-9 w-full items-center justify-between overflow-hidden rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <span className={cn("truncate", !selectedLabel && "text-muted-foreground")}>
               {selectedLabel ?? placeholder}

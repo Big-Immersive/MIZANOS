@@ -23,6 +23,7 @@ import { MarketingTab } from "@/components/organisms/marketing/MarketingTab";
 import { SourcesTab } from "@/components/organisms/product/SourcesTab";
 import { BugsTab } from "@/components/organisms/product/BugsTab";
 import { QAChecklistTab } from "@/components/organisms/product/QAChecklistTab";
+import { DevStandardsTab } from "@/components/organisms/product/DevStandardsTab";
 import { ProductSettingsDialog } from "@/components/organisms/product/ProductSettingsDialog";
 import { LinkGitHubDialog } from "@/components/organisms/product/LinkGitHubDialog";
 import { GitHubLinkBanner } from "@/components/molecules/github/GitHubLinkBanner";
@@ -160,8 +161,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           </div>
         }
         environmentsContent={<EnvironmentsTab productId={id} />}
-        marketingContent={<MarketingTab productId={id} />}
+        marketingContent={<MarketingTab productId={id} canViewCredentials />}
         qaContent={<QAChecklistTab productId={id} />}
+        devStandardsContent={<DevStandardsTab productId={id} />}
         sourcesContent={<SourcesTab productId={id} />}
       />
       <LinkGitHubDialog

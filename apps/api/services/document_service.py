@@ -60,11 +60,21 @@ class DocumentService(BaseService[ProductDocument]):
         file,
         uploaded_by: str | None = None,
     ) -> ProductDocument:
+        from apps.api.services.gcs_storage_service import storage_service
+
         content = await file.read()
+        filename = file.filename or "untitled"
+        content_type = file.content_type or "application/octet-stream"
+
+        # Store file via storage service (GCS/S3/local fallback)
+        destination = f"documents/{product_id}/{filename}"
+        file_path = await storage_service.upload_file(content, destination, content_type)
+
         doc = ProductDocument(
             product_id=product_id,
-            file_name=file.filename or "untitled",
-            file_type=file.content_type,
+            file_name=filename,
+            file_path=file_path,
+            file_type=content_type,
             file_size=len(content),
             uploaded_by=uploaded_by,
         )

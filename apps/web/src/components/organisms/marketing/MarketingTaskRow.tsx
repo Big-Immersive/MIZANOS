@@ -1,100 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { Badge } from "@/components/atoms/display/Badge";
-import { TaskRow } from "@/components/molecules/tasks/TaskRow";
-import { AddMarketingTaskDialog } from "./AddMarketingTaskDialog";
-import { useSubtasks } from "@/hooks/queries/useMarketingTasks";
-import { useCreateSubtask } from "@/hooks/mutations/useMarketingTaskMutations";
-import { MARKETING_TASK_STATUS_DISPLAY } from "@/lib/constants";
-import type { Task, KanbanTask } from "@/lib/types";
-import { ChevronRight, ChevronDown, Plus } from "lucide-react";
+import { Circle, CheckCircle2, User, Trash2 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/atoms/inputs/BaseSelect";
+import type { Task } from "@/lib/types";
 
 interface MarketingTaskRowProps {
   task: Task;
-  selected: boolean;
   assigneeName?: string;
-  assigneeMap: Map<string, string>;
-  assigneeOptions: { value: string; label: string }[];
-  productId: string;
-  onToggle: () => void;
+  onStatusChange: (status: string) => void;
+  onDelete: () => void;
   onClick: () => void;
 }
 
-export function MarketingTaskRow({
-  task, selected, assigneeName, assigneeMap, assigneeOptions, productId, onToggle, onClick,
-}: MarketingTaskRowProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [addSubOpen, setAddSubOpen] = useState(false);
-  const { data: subtasks = [] } = useSubtasks(expanded ? task.id : "");
-  const createSubtask = useCreateSubtask(productId, task.id);
-  const subtaskCount = task.subtask_count ?? 0;
+const STATUS_OPTIONS = [
+  { value: "planned", label: "Planned" },
+  { value: "in_execution", label: "In Execution" },
+  { value: "completed", label: "Completed" },
+];
+
+export function MarketingTaskRow({ task, assigneeName, onStatusChange, onDelete, onClick }: MarketingTaskRowProps) {
+  const isComplete = task.status === "completed";
 
   return (
-    <div>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-          className="p-1 rounded hover:bg-accent/50 shrink-0"
-          aria-label={expanded ? "Collapse subtasks" : "Expand subtasks"}
-        >
-          {expanded
-            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-        </button>
-        <div className="flex-1 min-w-0 relative">
-          <TaskRow
-            task={task}
-            selected={selected}
-            assigneeName={assigneeName}
-            onToggle={onToggle}
-            onClick={onClick}
-            statusDisplay={MARKETING_TASK_STATUS_DISPLAY}
-            hideCheckbox
-          />
-          {subtaskCount > 0 && (
-            <Badge variant="secondary" className="absolute top-3 right-28 text-[10px]">
-              {subtaskCount} subtask{subtaskCount !== 1 ? "s" : ""}
-            </Badge>
-          )}
-        </div>
+    <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/30 transition-colors group">
+      <button
+        type="button"
+        onClick={() => onStatusChange(isComplete ? "planned" : "completed")}
+        className="shrink-0 mt-0.5"
+      >
+        {isComplete ? (
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+        ) : (
+          <Circle className="h-5 w-5 text-muted-foreground/40 hover:text-primary/70" />
+        )}
+      </button>
+
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+        <p className={`text-sm font-medium ${isComplete ? "line-through text-muted-foreground" : ""}`}>
+          {task.title}
+        </p>
+        {task.description && (
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>
+        )}
       </div>
 
-      {expanded && (
-        <div className="ml-8 mt-1 space-y-1 border-l-2 border-muted pl-3 pb-2">
-          {subtasks.map((sub) => (
-            <TaskRow
-              key={sub.id}
-              task={sub}
-              selected={false}
-              assigneeName={sub.assignee_id ? assigneeMap.get(sub.assignee_id) : undefined}
-              onToggle={() => {}}
-              onClick={onClick}
-              statusDisplay={MARKETING_TASK_STATUS_DISPLAY}
-              hideCheckbox
-            />
-          ))}
-          <button
-            type="button"
-            onClick={() => setAddSubOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Plus className="h-3 w-3" /> Add Subtask
-          </button>
-        </div>
-      )}
+      <div className="flex items-center gap-2 shrink-0">
+        {assigneeName && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <User className="h-3 w-3" /> {assigneeName}
+          </span>
+        )}
 
-      <AddMarketingTaskDialog
-        open={addSubOpen}
-        onOpenChange={setAddSubOpen}
-        isLoading={createSubtask.isPending}
-        assigneeOptions={assigneeOptions}
-        isSubtask
-        onSubmit={(data) => {
-          createSubtask.mutate(data, { onSuccess: () => setAddSubOpen(false) });
-        }}
-      />
+        <Select value={task.status ?? "planned"} onValueChange={onStatusChange}>
+          <SelectTrigger className="h-7 w-[120px] text-xs border-muted">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((s) => (
+              <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <button
+          type="button"
+          onClick={onDelete}
+          className="p-1 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+        </button>
+      </div>
     </div>
   );
 }

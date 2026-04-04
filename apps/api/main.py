@@ -65,6 +65,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError("JWT_SECRET_KEY must be set via environment variable")
     if not settings.credential_encryption_key:
         raise RuntimeError("CREDENTIAL_ENCRYPTION_KEY must be set via environment variable")
+
+    # Seed standard checklist templates if they don't exist
+    from apps.api.services.seed_checklists import run_checklist_seeds
+    await run_checklist_seeds()
+
     yield
 
 

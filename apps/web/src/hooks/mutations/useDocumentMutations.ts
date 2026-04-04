@@ -9,8 +9,11 @@ export function useUploadDocument(productId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Partial<ProductDocument>): Promise<ProductDocument> =>
-      documentsRepository.create({ ...data, product_id: productId }),
+    mutationFn: (file: File): Promise<ProductDocument> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return documentsRepository.upload(productId, formData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents", productId] });
       toast.success("Document uploaded");

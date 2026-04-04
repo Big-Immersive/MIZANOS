@@ -108,6 +108,11 @@ async def list_credentials(product_id: UUID, user: CurrentUser = None, service: 
     return await service.get_credentials(product_id)
 
 
+@router.delete("/credentials/{credential_id}", status_code=204)
+async def delete_credential(credential_id: UUID, user: CurrentUser = None, service: MarketingService = Depends(get_service)):
+    await service.delete_credential(credential_id)
+
+
 @router.get("/credentials/{credential_id}/decrypt", response_model=CredentialDecryptResponse)
 async def decrypt_credential(credential_id: UUID, user: CurrentUser = None, service: MarketingService = Depends(get_service)):
     return await service.decrypt_credential(credential_id)

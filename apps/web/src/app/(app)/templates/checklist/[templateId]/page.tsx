@@ -12,12 +12,15 @@ import {
 import { useChecklistTemplateDetail, useChecklistCategories } from "@/hooks/queries/useChecklistTemplates";
 import {
   useAddChecklistTemplateItem,
+  useBulkAddChecklistTemplateItems,
   useUpdateChecklistTemplateItem,
   useDeleteChecklistTemplateItem,
   useCreateChecklistCategory,
 } from "@/hooks/mutations/useChecklistTemplateMutations";
 import { CHECKLIST_STATUS_LABELS } from "@/lib/types/checklist-template";
-import { ArrowLeft, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { BaseTextarea } from "@/components/atoms/inputs/BaseTextarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/atoms/layout/Dialog";
+import { ArrowLeft, GripVertical, List, Pencil, Plus, Trash2 } from "lucide-react";
 
 interface Props {
   params: Promise<{ templateId: string }>;
@@ -28,6 +31,7 @@ export default function ChecklistTemplateDetailPage({ params }: Props) {
   const { data: template, isLoading } = useChecklistTemplateDetail(templateId);
   const { data: categories = [] } = useChecklistCategories();
   const addItem = useAddChecklistTemplateItem(templateId);
+  const bulkAddItems = useBulkAddChecklistTemplateItems(templateId);
   const updateItem = useUpdateChecklistTemplateItem(templateId);
   const deleteItem = useDeleteChecklistTemplateItem(templateId);
   const createCategory = useCreateChecklistCategory();
@@ -40,6 +44,9 @@ export default function ChecklistTemplateDetailPage({ params }: Props) {
   const [showCustomCat, setShowCustomCat] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkCategory, setBulkCategory] = useState("general");
 
   if (isLoading) return <div className="p-6"><Skeleton className="h-64" /></div>;
   if (!template) return <div className="p-6 text-center text-muted-foreground">Template not found</div>;
@@ -58,7 +65,28 @@ export default function ChecklistTemplateDetailPage({ params }: Props) {
     setCustomCategory("");
   };
 
-  const categoryOptions = ["general", ...categories.map((c) => c.name)].filter((v, i, a) => a.indexOf(v) === i);
+  const handleBulkAdd = async () => {
+    const lines = bulkText.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    // Auto-detect headings: lines starting with # or lines followed by indented items
+    let currentCategory = bulkCategory;
+    const items: Array<{ title: string; category: string; default_status: string }> = [];
+    for (const line of lines) {
+      if (line.startsWith("#")) {
+        currentCategory = line.replace(/^#+\s*/, "").trim();
+      } else {
+        items.push({ title: line, category: currentCategory, default_status: "new" });
+      }
+    }
+    if (items.length === 0) return;
+    bulkAddItems.mutate(items);
+    setBulkText("");
+    setBulkOpen(false);
+  };
+
+  const itemCategories = template ? template.items.map((i) => i.category) : [];
+  const categoryOptions = ["general", ...categories.map((c) => c.name), ...itemCategories].filter((v, i, a) => a.indexOf(v) === i);
 
   return (
     <div className="p-6 space-y-6">
@@ -120,43 +148,99 @@ export default function ChecklistTemplateDetailPage({ params }: Props) {
         </div>
       )}
 
-      <div className="space-y-1">
-        {template.items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 p-2 rounded-md border hover:bg-accent/50 group">
-            <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-            {editingItemId === item.id ? (
-              <BaseInput
-                value={editTitle}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditTitle(e.target.value)}
-                onKeyDown={(e: React.KeyboardEvent) => {
-                  if (e.key === "Enter" && editTitle.trim()) { updateItem.mutate({ itemId: item.id, title: editTitle.trim() }); setEditingItemId(null); }
-                  if (e.key === "Escape") setEditingItemId(null);
-                }}
-                className="h-7 text-sm flex-1"
-                autoFocus
-              />
-            ) : (
-              <span className="flex-1 text-sm">{item.title}</span>
-            )}
-            <Badge variant="outline" className="text-[9px] shrink-0">{item.category}</Badge>
-            <Badge variant="secondary" className="text-[9px] shrink-0">{CHECKLIST_STATUS_LABELS[item.default_status] ?? item.default_status}</Badge>
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button onClick={() => { setEditingItemId(item.id); setEditTitle(item.title); }} className="p-1 rounded hover:bg-accent">
-                <Pencil className="h-3 w-3 text-muted-foreground" />
-              </button>
-              <button onClick={() => deleteItem.mutate(item.id)} className="p-1 rounded hover:bg-destructive/10">
-                <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-              </button>
-            </div>
-          </div>
-        ))}
-
+      <div className="space-y-4">
         {template.items.length === 0 && (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            No items yet. Click "Add Item" to create checklist items for this template.
+            No items yet. Click &quot;Add Item&quot; or &quot;Bulk Add&quot; to create checklist items.
           </div>
         )}
+
+        {(() => {
+          const grouped: Record<string, typeof template.items> = {};
+          for (const item of template.items) {
+            const cat = item.category || "general";
+            (grouped[cat] ??= []).push(item);
+          }
+          return Object.entries(grouped).map(([category, items]) => (
+            <div key={category} className="space-y-1">
+              <div className="flex items-center gap-2 py-2 border-b border-border">
+                <h3 className="text-sm font-semibold text-foreground">{category}</h3>
+                <Badge variant="outline" className="text-[9px]">{items.length}</Badge>
+              </div>
+              {items.map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-2 p-2 rounded-md border hover:bg-accent/50 group ml-2">
+                  <span className="text-xs text-muted-foreground w-5 shrink-0">{idx + 1}.</span>
+                  <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                  {editingItemId === item.id ? (
+                    <BaseInput
+                      value={editTitle}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditTitle(e.target.value)}
+                      onKeyDown={(e: React.KeyboardEvent) => {
+                        if (e.key === "Enter" && editTitle.trim()) { updateItem.mutate({ itemId: item.id, title: editTitle.trim() }); setEditingItemId(null); }
+                        if (e.key === "Escape") setEditingItemId(null);
+                      }}
+                      className="h-7 text-sm flex-1"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="flex-1 text-sm">{item.title}</span>
+                  )}
+                  <Badge variant="secondary" className="text-[9px] shrink-0">{CHECKLIST_STATUS_LABELS[item.default_status] ?? item.default_status}</Badge>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button onClick={() => { setEditingItemId(item.id); setEditTitle(item.title); }} className="p-1 rounded hover:bg-accent">
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button onClick={() => deleteItem.mutate(item.id)} className="p-1 rounded hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ));
+        })()}
       </div>
+
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Bulk Add Checklist Items</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Use <code className="text-xs bg-muted px-1 rounded">#</code> to create category headings. Items below a heading belong to that category.
+            </p>
+            <BaseTextarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={"# Functional Testing\nAll core features work as per spec\nForm validations enforce required fields\n\n# Security\nNo sensitive data exposed in console\nHTTPS enforced on all environments"}
+              rows={12}
+              autoFocus
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground shrink-0">Default category (items without #):</span>
+              <Select value={bulkCategory} onValueChange={setBulkCategory}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-between items-center pt-2">
+              <span className="text-xs text-muted-foreground">
+                {bulkText.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#")).length} items,{" "}
+                {bulkText.split("\n").filter((l) => l.trim().startsWith("#")).length} categories
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancel</Button>
+                <Button onClick={handleBulkAdd} disabled={!bulkText.trim() || addItem.isPending}>
+                  Add All
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
