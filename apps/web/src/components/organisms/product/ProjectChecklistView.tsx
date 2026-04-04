@@ -188,9 +188,6 @@ function ChecklistCard({
   onDeleteChecklist: () => void;
   onCreateTask: (title: string) => void;
   onToggleAddItem: () => void;
-  newItemTitle: string;
-  onNewItemTitleChange: (v: string) => void;
-  onAddItem: () => void;
 }) {
   const completed = checklist.completed_count;
   const total = checklist.item_count;
