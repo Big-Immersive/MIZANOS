@@ -50,6 +50,27 @@ class TaskAttachmentService:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def download(self, attachment_id: UUID) -> tuple[bytes, str, str]:
+        """Fetch file bytes from storage. Returns (content, filename, content_type)."""
+        import httpx
+        from pathlib import Path
+
+        attachment = await self.session.get(TaskAttachment, attachment_id)
+        if not attachment:
+            not_found("Attachment")
+
+        file_path = attachment.file_path
+        if file_path.startswith("http"):
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(file_path)
+                resp.raise_for_status()
+                return resp.content, attachment.file_name, attachment.file_type
+        else:
+            local = Path(file_path.lstrip("/"))
+            if not local.exists():
+                not_found("File")
+            return local.read_bytes(), attachment.file_name, attachment.file_type
+
     async def delete(self, attachment_id: UUID) -> None:
         attachment = await self.session.get(TaskAttachment, attachment_id)
         if not attachment:

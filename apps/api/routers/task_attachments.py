@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import Response
 
 from apps.api.dependencies import CurrentUser, DbSession
 from apps.api.schemas.task_attachment import TaskAttachmentResponse
@@ -35,6 +36,21 @@ async def list_attachments(
 ):
     """List all attachments for a task/bug."""
     return await service.list_by_task(task_id)
+
+
+@router.get("/download/{attachment_id}")
+async def download_attachment(
+    attachment_id: UUID,
+    user: CurrentUser = None,
+    service: TaskAttachmentService = Depends(_get_service),
+):
+    """Download/proxy a file attachment (handles private S3 buckets)."""
+    content, filename, content_type = await service.download(attachment_id)
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.delete("/{attachment_id}")
