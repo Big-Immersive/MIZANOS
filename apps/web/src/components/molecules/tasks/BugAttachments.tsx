@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { BaseButton } from "@/components/atoms/buttons/BaseButton";
 import { useTaskAttachments } from "@/hooks/queries/useTaskAttachments";
 import {
@@ -8,6 +8,7 @@ import {
   useDeleteAttachment,
 } from "@/hooks/mutations/useTaskAttachmentMutations";
 import { Paperclip, Upload, Trash2, Download, FileText, ImageIcon, Eye, X } from "lucide-react";
+import type { TaskAttachment } from "@/lib/types";
 
 interface BugAttachmentsProps {
   taskId: string;
@@ -23,14 +24,22 @@ function isImage(fileType: string): boolean {
   return fileType.startsWith("image/");
 }
 
-function getDownloadUrl(filePath: string): string {
-  if (filePath.startsWith("http")) return filePath;
+function getProxyUrl(attachmentId: string): string {
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4006";
-  return `${base}${filePath.startsWith("/") ? "" : "/"}${filePath}`;
+  return `${base}/task-attachments/download/${attachmentId}`;
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchWithAuth(url: string): Promise<Response> {
+  return fetch(url, { headers: getAuthHeaders() });
 }
 
 async function forceDownload(url: string, fileName: string) {
-  const response = await fetch(url);
+  const response = await fetchWithAuth(url);
   const blob = await response.blob();
   const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -42,13 +51,29 @@ async function forceDownload(url: string, fileName: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
+function AuthImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchWithAuth(src).then(async (res) => {
+      if (cancelled) return;
+      const blob = await res.blob();
+      if (!cancelled) setBlobUrl(URL.createObjectURL(blob));
+    }).catch(() => {});
+    return () => { cancelled = true; if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [src]);
+
+  if (!blobUrl) return <div className={`${className} bg-secondary/50 animate-pulse`} />;
+  return <img src={blobUrl} alt={alt} className={className} />;
+}
+
 export function BugAttachments({ taskId }: BugAttachmentsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { data: attachments = [], isLoading } = useTaskAttachments(taskId);
   const uploadMutation = useUploadAttachment(taskId);
   const deleteMutation = useDeleteAttachment(taskId);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewName, setPreviewName] = useState("");
+  const [previewAtt, setPreviewAtt] = useState<TaskAttachment | null>(null);
 
   const images = attachments.filter((a) => isImage(a.file_type));
   const files = attachments.filter((a) => !isImage(a.file_type));
@@ -99,44 +124,45 @@ export function BugAttachments({ taskId }: BugAttachmentsProps) {
             <ImageIcon className="h-3 w-3" /> Images
           </p>
           <div className="flex gap-2 flex-wrap">
-            {images.map((att) => {
-              const url = getDownloadUrl(att.file_path);
-              return (
-                <div
-                  key={att.id}
-                  className="relative group rounded-md border overflow-hidden w-24 h-24 shrink-0 bg-secondary/30"
-                >
-                  <img src={url} alt={att.file_name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => { setPreviewUrl(url); setPreviewName(att.file_name); }}
-                      className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => forceDownload(url, att.file_name)}
-                      className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteMutation.mutate(att.id)}
-                      disabled={deleteMutation.isPending}
-                      className="p-1.5 rounded-full bg-white/20 hover:bg-red-500/80 text-white"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] px-1 py-0.5 truncate">
-                    {att.file_name}
-                  </span>
+            {images.map((att) => (
+              <div
+                key={att.id}
+                className="relative group rounded-md border overflow-hidden w-24 h-24 shrink-0 bg-secondary/30"
+              >
+                <AuthImage
+                  src={getProxyUrl(att.id)}
+                  alt={att.file_name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAtt(att)}
+                    className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => forceDownload(getProxyUrl(att.id), att.file_name)}
+                    className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteMutation.mutate(att.id)}
+                    disabled={deleteMutation.isPending}
+                    className="p-1.5 rounded-full bg-white/20 hover:bg-red-500/80 text-white"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-              );
-            })}
+                <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] px-1 py-0.5 truncate">
+                  {att.file_name}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -147,54 +173,51 @@ export function BugAttachments({ taskId }: BugAttachmentsProps) {
             <FileText className="h-3 w-3" /> Files
           </p>
           <div className="space-y-1">
-            {files.map((att) => {
-              const url = getDownloadUrl(att.file_path);
-              return (
-                <div key={att.id} className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
-                  <FileText className="h-4 w-4 text-blue-500 shrink-0" />
-                  <span className="flex-1 truncate font-medium">{att.file_name}</span>
-                  <span className="text-muted-foreground shrink-0">{formatSize(att.file_size)}</span>
-                  <button
-                    type="button"
-                    onClick={() => forceDownload(url, att.file_name)}
-                    className="text-primary hover:text-primary/80 shrink-0"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteMutation.mutate(att.id)}
-                    disabled={deleteMutation.isPending}
-                    className="text-destructive hover:text-destructive/80 shrink-0"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
+            {files.map((att) => (
+              <div key={att.id} className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
+                <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                <span className="flex-1 truncate font-medium">{att.file_name}</span>
+                <span className="text-muted-foreground shrink-0">{formatSize(att.file_size)}</span>
+                <button
+                  type="button"
+                  onClick={() => forceDownload(getProxyUrl(att.id), att.file_name)}
+                  className="text-primary hover:text-primary/80 shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteMutation.mutate(att.id)}
+                  disabled={deleteMutation.isPending}
+                  className="text-destructive hover:text-destructive/80 shrink-0"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {previewUrl && (
+      {previewAtt && (
         <div
           className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-8"
-          onClick={() => setPreviewUrl(null)}
+          onClick={() => setPreviewAtt(null)}
         >
           <div className="relative max-w-2xl max-h-[80vh] w-full" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={() => setPreviewUrl(null)}
+              onClick={() => setPreviewAtt(null)}
               className="absolute -top-10 right-0 text-white hover:text-white/80 flex items-center gap-1 text-sm"
             >
               <X className="h-4 w-4" /> Close
             </button>
-            <img
-              src={previewUrl}
-              alt={previewName}
+            <AuthImage
+              src={getProxyUrl(previewAtt.id)}
+              alt={previewAtt.file_name}
               className="w-full max-h-[80vh] object-contain rounded-lg"
             />
-            <p className="text-center text-white text-xs mt-2 opacity-70">{previewName}</p>
+            <p className="text-center text-white text-xs mt-2 opacity-70">{previewAtt.file_name}</p>
           </div>
         </div>
       )}
