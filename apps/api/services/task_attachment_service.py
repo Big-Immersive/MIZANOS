@@ -20,7 +20,8 @@ class TaskAttachmentService:
         from apps.api.services.gcs_storage_service import GCSStorageService
 
         content = await file.read()
-        filename = file.filename or "untitled"
+        raw_name = file.filename or "untitled"
+        filename = raw_name.replace(" ", "_")
         content_type = file.content_type or "application/octet-stream"
 
         storage = GCSStorageService()
