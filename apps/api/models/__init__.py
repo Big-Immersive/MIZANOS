@@ -55,6 +55,7 @@ from .checklist_template import (
     ProjectChecklistItem,
 )
 from .milestone import Milestone
+from .task_attachment import TaskAttachment
 from .task_checklist import TaskChecklistItem
 from .task_comment import TaskComment
 from .user import (
@@ -140,6 +141,7 @@ __all__ = [
     "Milestone",
     # Task
     "Task",
+    "TaskAttachment",
     "TaskChecklistItem",
     "TaskComment",
     "TaskTemplate",

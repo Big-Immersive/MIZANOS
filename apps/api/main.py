@@ -50,6 +50,7 @@ from apps.api.routers import (
     product_members,
     product_notification_settings,
     specification_sources,
+    task_attachments,
     task_checklist,
     task_comments,
     checklist_templates,
@@ -69,6 +70,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Seed standard checklist templates if they don't exist
     from apps.api.services.seed_checklists import run_checklist_seeds
     await run_checklist_seeds()
+
+    # Delete archived products past 30-day retention
+    from apps.api.services.archive_cleanup import run_archive_cleanup
+    await run_archive_cleanup()
 
     yield
 
@@ -137,6 +142,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(product_members.router, prefix="/products", tags=["product-members"])
 app.include_router(products.router, prefix="/products", tags=["products"])
 # checklist + comments must be before tasks so /{task_id}/checklist isn't caught by /{task_id}
+app.include_router(task_attachments.router, prefix="/task-attachments", tags=["task-attachments"])
 app.include_router(task_checklist.router, prefix="/tasks", tags=["task-checklist"])
 app.include_router(task_comments.router, prefix="/tasks", tags=["task-comments"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])

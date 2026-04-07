@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useState, useCallback } from "react";
 import { cn } from "@/lib/utils/cn";
 import {
   Tabs,
@@ -77,8 +77,14 @@ function ProductTabs({
   className,
 }: ProductTabsProps) {
   const [internalTab, setInternalTab] = useState(defaultTab);
+  const [resetKey, setResetKey] = useState(0);
   const activeTab = controlledTab ?? internalTab;
-  const setActiveTab = onTabChange ?? setInternalTab;
+  const baseSetActiveTab = onTabChange ?? setInternalTab;
+
+  const setActiveTab = useCallback(
+    (tab: string) => baseSetActiveTab(tab),
+    [baseSetActiveTab],
+  );
 
   const tabs: ProductTabConfig[] = [
     {
@@ -174,6 +180,9 @@ function ProductTabs({
             value={tab.value}
             disabled={tab.disabled}
             className="flex items-center gap-2"
+            onClick={() => {
+              if (activeTab === tab.value) setResetKey((k) => k + 1);
+            }}
           >
             {tab.icon}
             <span className="hidden sm:inline">{tab.label}</span>
@@ -188,7 +197,7 @@ function ProductTabs({
 
       <div inert={isArchived || undefined} className={cn(isArchived && "opacity-60")}>
         {tabs.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value} className="mt-6">
+          <TabsContent key={`${tab.value}-${resetKey}`} value={tab.value} className="mt-6">
             {tab.content}
           </TabsContent>
         ))}

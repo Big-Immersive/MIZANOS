@@ -21,6 +21,7 @@ export { EvaluationRepository, evaluationRepository } from "./evaluation.reposit
 export { OrgChartRepository, orgChartRepository } from "./org-chart.repository";
 export { GitHubPatsRepository, githubPatsRepository } from "./github-pats.repository";
 export { JobsRepository, jobsRepository } from "./jobs.repository";
+export { taskAttachmentsRepository } from "./task-attachments.repository";
 export { TaskCommentsRepository, taskCommentsRepository } from "./task-comments.repository";
 export { ScansRepository, scansRepository } from "./scans.repository";
 export { ReportsRepository, reportsRepository } from "./reports.repository";

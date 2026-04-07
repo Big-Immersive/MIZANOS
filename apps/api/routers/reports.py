@@ -20,6 +20,7 @@ from apps.api.services.report_service import ReportService, _commit_cache
 
 class GenerateDocumentRequest(BaseModel):
     product_ids: list[UUID]
+    report_type: str = "general"  # "general" or "bugs"
 
 router = APIRouter()
 
@@ -87,11 +88,12 @@ async def generate_document(
 ):
     """Generate a downloadable .docx report for selected projects."""
     svc = ReportDocumentService(db)
-    buf = await svc.generate(body.product_ids)
+    buf = await svc.generate(body.product_ids, report_type=body.report_type)
+    filename = "Bug_Report" if body.report_type == "bugs" else "Project_Status_Update"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": "attachment; filename=Project_Status_Update.docx"},
+        headers={"Content-Disposition": f"attachment; filename={filename}.docx"},
     )
 
 
@@ -103,9 +105,10 @@ async def generate_pdf(
 ):
     """Generate a downloadable PDF report for selected projects."""
     svc = ReportPDFService(db)
-    buf = await svc.generate(body.product_ids)
+    buf = await svc.generate(body.product_ids, report_type=body.report_type)
+    filename = "Bug_Report" if body.report_type == "bugs" else "Project_Status_Update"
     return StreamingResponse(
         buf,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=Project_Status_Update.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={filename}.pdf"},
     )

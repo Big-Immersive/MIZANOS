@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { use, useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Loader2, Pencil, Eye, Settings, Archive } from "lucide-react";
 
 import { EditableTitle } from "@/components/atoms/inputs/EditableTitle";
@@ -40,6 +40,8 @@ interface ProductDetailPageProps {
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { id } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const { data: product, isLoading } = useProductDetail(id);
   const updateProduct = useUpdateProduct();
   const { canEditProduct } = useRoleVisibility();
@@ -47,13 +49,28 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [docUploadOpen, setDocUploadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [linkGitHubOpen, setLinkGitHubOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
 
   const tabParam = searchParams.get("tab");
   const taskParam = searchParams.get("task");
+  const [activeTab, setActiveTabState] = useState(tabParam || "overview");
+
+  const setActiveTab = useCallback(
+    (tab: string) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === "overview") {
+        params.delete("tab");
+      } else {
+        params.set("tab", tab);
+      }
+      const query = params.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ""}` as never, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   useEffect(() => {
-    if (tabParam) setActiveTab(tabParam);
+    if (tabParam && tabParam !== activeTab) setActiveTabState(tabParam);
   }, [tabParam]);
 
   if (isLoading) {

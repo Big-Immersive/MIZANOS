@@ -48,7 +48,7 @@ class ReportDocumentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def generate(self, product_ids: list[UUID]) -> io.BytesIO:
+    async def generate(self, product_ids: list[UUID], report_type: str = "general") -> io.BytesIO:
         """Build a .docx report for the given product IDs."""
         svc = ReportService(self.session)
         summary = await svc.get_summary()
@@ -59,14 +59,15 @@ class ReportDocumentService:
             projects = summary["projects"]
 
         pids = [p["product_id"] for p in projects]
-        task_data = await svc.get_tasks_for_report(pids)
+        is_bugs = report_type == "bugs"
+        task_data = await svc.get_bugs_for_report(pids) if is_bugs else await svc.get_tasks_for_report(pids)
         ai_summary = await self._generate_executive_summary(projects, task_data)
 
         doc = Document()
         self._set_default_font(doc)
-        self._add_title(doc)
+        self._add_title(doc, is_bugs=is_bugs)
         self._add_executive_summary(doc, ai_summary)
-        self._add_project_updates(doc, projects, task_data)
+        self._add_project_updates(doc, projects, task_data, is_bugs=is_bugs)
         self._add_portfolio_table(doc, projects, task_data)
 
         buf = io.BytesIO()
@@ -86,7 +87,7 @@ class ReportDocumentService:
         font.size = Pt(10)
 
     @staticmethod
-    def _add_title(doc: Document) -> None:
+    def _add_title(doc: Document, is_bugs: bool = False) -> None:
         import os
         from docx.shared import Inches
 
@@ -140,12 +141,14 @@ class ReportDocumentService:
 
         title = doc.add_paragraph()
         title.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        run = title.add_run("PROJECT STATUS UPDATE")
+        title_text = "BUG STATUS REPORT" if is_bugs else "PROJECT STATUS UPDATE"
+        run = title.add_run(title_text)
         run.bold = True
         run.font.size = Pt(18)
         run.font.color.rgb = RGBColor(0, 0, 0)
 
-        date_str = datetime.now(timezone.utc).strftime("Daily Briefing - %d %B %Y")
+        date_fmt = "Bug Report - %d %B %Y" if is_bugs else "Daily Briefing - %d %B %Y"
+        date_str = datetime.now(timezone.utc).strftime(date_fmt)
         sub = doc.add_paragraph()
         run = sub.add_run(date_str)
         run.font.size = Pt(11)
@@ -166,10 +169,11 @@ class ReportDocumentService:
 
     @staticmethod
     def _add_project_updates(
-        doc: Document, projects: list[dict], task_data: dict,
+        doc: Document, projects: list[dict], task_data: dict, is_bugs: bool = False,
     ) -> None:
         heading = doc.add_paragraph()
-        run = heading.add_run("Project Updates")
+        section_title = "Bug Reports by Project" if is_bugs else "Project Updates"
+        run = heading.add_run(section_title)
         run.bold = True
         run.font.size = Pt(14)
 

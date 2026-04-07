@@ -7,6 +7,7 @@ interface PageHeaderProps {
   badge?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
+  onTitleClick?: () => void;
 }
 
 export function PageHeader({
@@ -16,6 +17,7 @@ export function PageHeader({
   badge,
   children,
   className,
+  onTitleClick,
 }: PageHeaderProps) {
   return (
     <div
@@ -34,7 +36,13 @@ export function PageHeader({
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold text-foreground truncate">
+              <h1
+                className={cn(
+                  "text-xl font-semibold text-foreground truncate",
+                  onTitleClick && "cursor-pointer hover:text-primary transition-colors",
+                )}
+                onClick={onTitleClick}
+              >
                 {title}
               </h1>
               {badge}

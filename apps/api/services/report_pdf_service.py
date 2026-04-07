@@ -37,7 +37,7 @@ class ReportPDFService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def generate(self, product_ids: list[UUID]) -> io.BytesIO:
+    async def generate(self, product_ids: list[UUID], report_type: str = "general") -> io.BytesIO:
         """Build a PDF report for the given product IDs."""
         svc = ReportService(self.session)
         summary = await svc.get_summary()
@@ -47,7 +47,8 @@ class ReportPDFService:
             projects = summary["projects"]
 
         pids = [p["product_id"] for p in projects]
-        task_data = await svc.get_tasks_for_report(pids)
+        is_bugs = report_type == "bugs"
+        task_data = await svc.get_bugs_for_report(pids) if is_bugs else await svc.get_tasks_for_report(pids)
         ai_summary = await self._generate_executive_summary(projects, task_data)
 
         pdf = _ReportPDF()
@@ -55,9 +56,9 @@ class ReportPDFService:
         pdf.set_auto_page_break(auto=True, margin=20)
         pdf.add_page()
 
-        self._add_title(pdf)
+        self._add_title(pdf, is_bugs=is_bugs)
         self._add_executive_summary(pdf, ai_summary)
-        self._add_project_updates(pdf, projects, task_data)
+        self._add_project_updates(pdf, projects, task_data, is_bugs=is_bugs)
         self._add_portfolio_table(pdf, projects, task_data)
 
         buf = io.BytesIO()
@@ -70,7 +71,7 @@ class ReportPDFService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _add_title(pdf: _ReportPDF) -> None:
+    def _add_title(pdf: _ReportPDF, is_bugs: bool = False) -> None:
         import os
         # Logo + "Mizan OS" top-right
         logo_path = os.path.join(os.path.dirname(__file__), "mizan_logo.png")
@@ -85,9 +86,10 @@ class ReportPDFService:
 
         pdf.set_font("Helvetica", "B", 20)
         pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 12, "PROJECT STATUS UPDATE", new_x="LMARGIN", new_y="NEXT")
+        title = "BUG STATUS REPORT" if is_bugs else "PROJECT STATUS UPDATE"
+        pdf.cell(0, 12, title, new_x="LMARGIN", new_y="NEXT")
 
-        date_str = datetime.now(timezone.utc).strftime("Daily Briefing - %d %B %Y")
+        date_str = datetime.now(timezone.utc).strftime("Bug Report - %d %B %Y" if is_bugs else "Daily Briefing - %d %B %Y")
         pdf.set_font("Helvetica", "", 11)
         pdf.set_text_color(100, 100, 100)
         pdf.cell(0, 8, date_str, new_x="LMARGIN", new_y="NEXT")
@@ -109,11 +111,12 @@ class ReportPDFService:
 
     @staticmethod
     def _add_project_updates(
-        pdf: _ReportPDF, projects: list[dict], task_data: dict,
+        pdf: _ReportPDF, projects: list[dict], task_data: dict, is_bugs: bool = False,
     ) -> None:
         pdf.set_font("Helvetica", "B", 14)
         pdf.set_text_color(31, 73, 125)
-        pdf.cell(0, 10, "Project Updates", new_x="LMARGIN", new_y="NEXT")
+        section_title = "Bug Reports by Project" if is_bugs else "Project Updates"
+        pdf.cell(0, 10, section_title, new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
 
         for proj in projects:

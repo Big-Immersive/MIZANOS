@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileDown, FileText, Loader2, CheckCircle2 } from "lucide-react";
+import { FileDown, FileText, Loader2, CheckCircle2, Bug, ClipboardList } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,11 +13,13 @@ import { BaseButton } from "@/components/atoms/buttons/BaseButton";
 import { BaseCheckbox } from "@/components/atoms/inputs/BaseCheckbox";
 import { ScrollArea } from "@/components/atoms/layout/ScrollArea";
 import { Badge } from "@/components/atoms/display/Badge";
+import { cn } from "@/lib/utils/cn";
 import { reportsRepository } from "@/lib/api/repositories";
 import { toast } from "sonner";
 import type { ProjectReportBrief } from "@/lib/types";
 
 type Format = "pdf" | "docx";
+type ReportType = "general" | "bugs";
 
 interface Props {
   open: boolean;
@@ -28,6 +30,7 @@ interface Props {
 export function GenerateReportDialog({ open, onOpenChange, projects }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generatingFormat, setGeneratingFormat] = useState<Format | null>(null);
+  const [reportType, setReportType] = useState<ReportType>("general");
 
   const toggleProject = (id: string) => {
     setSelected((prev) => {
@@ -56,14 +59,15 @@ export function GenerateReportDialog({ open, onOpenChange, projects }: Props) {
       const ids = Array.from(selected);
       const blob =
         format === "pdf"
-          ? await reportsRepository.generatePDF(ids)
-          : await reportsRepository.generateDocument(ids);
+          ? await reportsRepository.generatePDF(ids, reportType)
+          : await reportsRepository.generateDocument(ids, reportType);
 
       const ext = format === "pdf" ? "pdf" : "docx";
+      const prefix = reportType === "bugs" ? "Bug_Report" : "Project_Status_Update";
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Project_Status_Update_${new Date().toISOString().split("T")[0]}.${ext}`;
+      a.download = `${prefix}_${new Date().toISOString().split("T")[0]}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -86,9 +90,38 @@ export function GenerateReportDialog({ open, onOpenChange, projects }: Props) {
             Generate Report
           </DialogTitle>
           <DialogDescription>
-            Select the projects to include in the downloadable report.
+            Select report type and projects to include.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center gap-2 pb-1">
+          <button
+            type="button"
+            onClick={() => setReportType("general")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+              reportType === "general"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            General
+          </button>
+          <button
+            type="button"
+            onClick={() => setReportType("bugs")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+              reportType === "bugs"
+                ? "bg-red-600 text-white"
+                : "bg-secondary text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Bug className="h-3.5 w-3.5" />
+            Bugs
+          </button>
+        </div>
 
         <div className="flex items-center justify-between py-2">
           <button

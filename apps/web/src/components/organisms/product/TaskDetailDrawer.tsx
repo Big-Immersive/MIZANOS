@@ -18,6 +18,7 @@ import { BaseTextarea } from "@/components/atoms/inputs/BaseTextarea";
 import { BaseLabel } from "@/components/atoms/inputs/BaseLabel";
 import { SelectField } from "@/components/molecules/forms/SelectField";
 import { DeleteTaskDialog } from "@/components/molecules/feedback/DeleteTaskDialog";
+import { BugAttachments } from "@/components/molecules/tasks/BugAttachments";
 import { CommentThread } from "@/components/molecules/comments/CommentThread";
 import { TaskChecklist } from "@/components/molecules/tasks/TaskChecklist";
 import { useProductMembers } from "@/hooks/queries/useProductMembers";
@@ -198,6 +199,12 @@ export function TaskDetailDrawer({
               <BaseTextarea id="drawer-desc" className="resize-y" rows={7} {...register("description")} disabled={!canEditDetails} />
             </div>
 
+            {isBug && task && (
+              <div className="border-t pt-3">
+                <BugAttachments taskId={task.id} />
+              </div>
+            )}
+
             {task && (
               <div
                 className="border-t pt-3"
@@ -225,7 +232,7 @@ export function TaskDetailDrawer({
               />
             )}
 
-            {milestoneOptions.length > 0 && canEditDetails && (
+            {milestoneOptions.length > 0 && canEditDetails && !isBug && (
               <SelectField
                 label="Milestone"
                 placeholder="Select milestone"

@@ -33,12 +33,23 @@ export function useUpdateBug(productId: string) {
   return useMutation({
     mutationFn: ({ id, ...updates }: { id: string } & Partial<Task>): Promise<Task> =>
       tasksRepository.update(id, updates),
-    onSuccess: () => {
+    onMutate: async ({ id, ...updates }) => {
+      await queryClient.cancelQueries({ queryKey: ["bugs", productId] });
+      const previous = queryClient.getQueryData<Task[]>(["bugs", productId]);
+      queryClient.setQueryData<Task[]>(["bugs", productId], (old) =>
+        old?.map((bug) => (bug.id === id ? { ...bug, ...updates } : bug)),
+      );
+      return { previous };
+    },
+    onError: (error: Error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["bugs", productId], context.previous);
+      }
+      toast.error("Failed to update bug: " + error.message);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["bugs", productId] });
       queryClient.invalidateQueries({ queryKey: ["bugs", "all"] });
-    },
-    onError: (error: Error) => {
-      toast.error("Failed to update bug: " + error.message);
     },
   });
 }

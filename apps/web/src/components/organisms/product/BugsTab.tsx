@@ -22,7 +22,7 @@ interface BugsTabProps { productId: string }
 type FilterStatus = BugStatus | "all";
 type FilterPriority = TaskPriority | "all";
 
-const STATUS_CARDS: BugStatus[] = ["reported", "triaging", "in_progress", "fixed", "verified", "live"];
+const STATUS_CARDS: BugStatus[] = ["reported", "triaging", "in_progress", "fixed", "verified", "reopened", "live"];
 
 function BugsTab({ productId }: BugsTabProps) {
   const { user } = useAuth();
@@ -118,7 +118,7 @@ function BugsTab({ productId }: BugsTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-7 gap-2">
         {STATUS_CARDS.map((status) => {
           const config = BUG_STATUS_DISPLAY[status];
           const Icon = config.icon;
@@ -181,6 +181,7 @@ function BugsTab({ productId }: BugsTabProps) {
             onToggle={() => toggleSelect(bug.id)}
             onClick={() => { setEditBug(toKanbanTask(bug, assigneeMap)); setEditDialogOpen(true); }}
             statusDisplay={BUG_STATUS_DISPLAY}
+            onStatusChange={(bugId, status) => updateBug.mutate({ id: bugId, status })}
           />
         ))}
       </div>

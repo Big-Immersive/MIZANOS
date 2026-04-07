@@ -6,6 +6,7 @@ import { Badge } from "@/components/atoms/display/Badge";
 import { Button } from "@/components/molecules/buttons/Button";
 import { PageHeader } from "@/components/molecules/layout/PageHeader";
 import { ProductCard } from "@/components/molecules/product/ProductCard";
+import { ArchivedProductCard } from "@/components/molecules/product/ArchivedProductCard";
 import { ProductTable } from "@/components/organisms/product/ProductTable";
 import { ProductsFilterBar } from "@/components/organisms/dashboard/ProductsFilterBar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +14,7 @@ import { useAllTasks } from "@/hooks/queries/useAllTasks";
 import { useAllProductMembers } from "@/hooks/queries/useProductMembers";
 import { useProducts } from "@/hooks/queries/useProducts";
 import { useProfiles } from "@/hooks/queries/useProfiles";
+import { useUnarchiveProduct } from "@/hooks/mutations/useProductMutations";
 import { useProductRoleFilters } from "@/hooks/utils/useProductRoleFilters";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 import { isMyDashboardEnabled, buildMyProjectIds } from "@/hooks/utils/useMyDashboard";
@@ -48,6 +50,15 @@ export default function ProductsPage() {
   const { data: profiles = [] } = useProfiles();
   const { isSuperAdmin, isProjectManager } = useRoleVisibility();
   const canCreateProject = isSuperAdmin || isProjectManager;
+  const unarchiveProduct = useUnarchiveProduct();
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const handleRestore = (productId: string) => {
+    setRestoringId(productId);
+    unarchiveProduct.mutate(productId, {
+      onSettled: () => setRestoringId(null),
+    });
+  };
 
   const pmNameMap = useMemo(() => {
     const profileMap = new Map<string, string>();
@@ -79,8 +90,10 @@ export default function ProductsPage() {
     const matchesSearch = product.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
+    const progress = product.progress ?? 0;
+    const health = progress >= 80 ? "healthy" : progress >= 60 ? "warning" : "critical";
     const matchesStatus =
-      statusFilter === "all" || product.status === statusFilter;
+      statusFilter === "all" || health === statusFilter;
     const matchesPillar =
       pillarFilter === "all" || product.pillar === pillarFilter;
     const matchesStage =
@@ -110,8 +123,9 @@ export default function ProductsPage() {
     <div className="p-6 space-y-5">
       <PageHeader
         title="Projects"
-        subtitle="All projects across your organization"
+        subtitle={showArchived ? "Click title to view all projects" : "All projects across your organization"}
         icon={<FolderKanban className="h-5 w-5 text-primary" />}
+        onTitleClick={showArchived ? () => setShowArchived(false) : undefined}
         badge={
           <Badge variant="secondary" className="font-mono text-xs">
             {filteredProducts.length}
@@ -131,30 +145,28 @@ export default function ProductsPage() {
       </PageHeader>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <ProductsFilterBar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            pillarFilter={pillarFilter}
-            onPillarChange={setPillarFilter}
-            stageFilter={stageFilter}
-            onStageChange={setStageFilter}
-            stages={stages}
-            roleFilters={roleFilters}
-            myProjectsActive={myProjectsOnly}
-            onMyProjectsToggle={() => setMyProjectsOnly((v) => !v)}
-            hasActiveFilters={hasActiveFilters}
-            onClearFilters={clearFilters}
-          />
-        </div>
+        <ProductsFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          pillarFilter={pillarFilter}
+          onPillarChange={setPillarFilter}
+          stageFilter={stageFilter}
+          onStageChange={setStageFilter}
+          stages={stages}
+          roleFilters={roleFilters}
+          myProjectsActive={myProjectsOnly}
+          onMyProjectsToggle={() => setMyProjectsOnly((v) => !v)}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+        />
         {archivedCount > 0 && (
           <Button
             variant={showArchived ? "default" : "outline"}
             size="sm"
             className={cn(
-              "h-9 text-xs gap-1.5 transition-all",
+              "h-9 text-xs gap-1.5 transition-all shrink-0",
               showArchived
                 ? "bg-amber-600 hover:bg-amber-700 text-white shadow-md border-amber-600"
                 : "text-muted-foreground hover:text-foreground",
@@ -162,10 +174,10 @@ export default function ProductsPage() {
             onClick={() => setShowArchived(!showArchived)}
           >
             <Archive className="h-3.5 w-3.5" />
-            Archived ({archivedCount})
+            {showArchived ? "Back to Projects" : `Archived (${archivedCount})`}
           </Button>
         )}
-        <div className="flex items-center gap-1.5 p-1 bg-secondary/50 rounded-lg ml-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-secondary/50 rounded-lg shrink-0">
           <Button
             variant={viewMode === "list" ? "secondary" : "ghost"}
             size="icon"
@@ -192,7 +204,33 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {!isLoading && filteredProducts.length > 0 && viewMode === "grid" && (
+      {!isLoading && filteredProducts.length > 0 && viewMode === "grid" && showArchived && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-lg font-bold text-foreground">Archived Projects</h2>
+            <Badge variant="secondary" className="text-sm font-mono font-semibold px-2.5 py-1">
+              {filteredProducts.length}
+            </Badge>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <p className="text-xs text-red-500">
+            Archived projects are permanently deleted after 30 days.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredProducts.map((product) => (
+              <ArchivedProductCard
+                key={product.id}
+                product={product}
+                pmName={pmNameMap.get(product.id)}
+                onRestore={handleRestore}
+                isRestoring={restoringId === product.id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!isLoading && filteredProducts.length > 0 && viewMode === "grid" && !showArchived && (
         <div className="space-y-6">
           {stages
             .filter((stage) => filteredProducts.some((p) => (p.stage || "Intake") === stage))

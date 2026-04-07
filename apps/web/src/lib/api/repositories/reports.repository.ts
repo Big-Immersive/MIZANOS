@@ -47,19 +47,19 @@ export class ReportsRepository {
     return response.data;
   }
 
-  async generateDocument(productIds: string[]): Promise<Blob> {
+  async generateDocument(productIds: string[], reportType: string = "general"): Promise<Blob> {
     const response = await this.client.post(
       `${this.basePath}/generate-document`,
-      { product_ids: productIds },
+      { product_ids: productIds, report_type: reportType },
       { responseType: "blob", timeout: 180_000 },
     );
     return response.data;
   }
 
-  async generatePDF(productIds: string[]): Promise<Blob> {
+  async generatePDF(productIds: string[], reportType: string = "general"): Promise<Blob> {
     const response = await this.client.post(
       `${this.basePath}/generate-pdf`,
-      { product_ids: productIds },
+      { product_ids: productIds, report_type: reportType },
       { responseType: "blob", timeout: 180_000 },
     );
     return response.data;

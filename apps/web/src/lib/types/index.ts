@@ -116,6 +116,7 @@ export type { OrgChartNode, UpdateReportingLineRequest } from "./org-chart";
 
 export type { GitHubPat, GitHubPatVerifyResult } from "./github-pat";
 
+export type { TaskAttachment } from "./task-attachment";
 export type { TaskComment } from "./task-comment";
 
 export type { Job, JobStatus, JobCreateResponse } from "./job";

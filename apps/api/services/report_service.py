@@ -733,5 +733,78 @@ class ReportService:
         }
 
 
+    async def get_bugs_for_report(self, product_ids: list[UUID]) -> dict[UUID, dict]:
+        """Return per-project bug summary + all bugs grouped by status."""
+        from apps.api.models.user import Profile
+
+        BUG_STATUS_ORDER = ["reported", "triaging", "in_progress", "reopened", "fixed", "verified", "wont_fix", "live"]
+
+        result: dict[UUID, dict] = {}
+
+        for pid in product_ids:
+            stmt = (
+                select(
+                    Task.title, Task.status, Task.priority,
+                    Task.due_date, Task.updated_at, Task.assignee_id,
+                    Profile.full_name.label("assignee_name"),
+                )
+                .outerjoin(Profile, Task.assignee_id == Profile.id)
+                .where(
+                    Task.product_id == pid,
+                    Task.task_type == "bug",
+                    Task.is_draft == False,  # noqa: E712
+                )
+                .order_by(Task.status, Task.priority.desc())
+            )
+            rows = (await self.session.execute(stmt)).all()
+
+            status_groups: dict[str, list[dict]] = {}
+            status_counts: dict[str, int] = {}
+            total = 0
+
+            for row in rows:
+                status = (row.status or "reported").lower()
+                total += 1
+                status_counts[status] = status_counts.get(status, 0) + 1
+
+                bug_data = {
+                    "title": row.title,
+                    "status": status,
+                    "priority": row.priority or "none",
+                    "assignee_name": row.assignee_name or "Unassigned",
+                    "due_date": row.due_date.isoformat() if row.due_date else None,
+                    "tag": status.upper().replace("_", " "),
+                    "show_assignee": True,
+                }
+
+                if status not in status_groups:
+                    status_groups[status] = []
+                status_groups[status].append(bug_data)
+
+            # Sort groups by defined order
+            sorted_groups: dict[str, list[dict]] = {}
+            for s in BUG_STATUS_ORDER:
+                if s in status_groups:
+                    sorted_groups[s] = status_groups[s]
+            for s in status_groups:
+                if s not in sorted_groups:
+                    sorted_groups[s] = status_groups[s]
+
+            # Build summary line
+            fixed = status_counts.get("fixed", 0) + status_counts.get("verified", 0) + status_counts.get("live", 0)
+            open_bugs = total - fixed
+            summary = f"Bugs: {total} total | {fixed} Fixed/Verified | {open_bugs} Open"
+
+            result[pid] = {
+                "summary_line": summary,
+                "milestones": sorted_groups,
+                "has_multiple_assignees": True,
+                "links": [],
+                "code_progress": 0.0,
+            }
+
+        return result
+
+
 def _pct(part: int, total: int) -> float:
     return round((part / total) * 100, 1) if total else 0.0
