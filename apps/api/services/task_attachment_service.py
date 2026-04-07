@@ -61,25 +61,25 @@ class TaskAttachmentService:
             not_found("Attachment")
 
         file_path = attachment.file_path
+        storage = GCSStorageService()
 
-        # S3 stored file — use S3 client with credentials
-        if file_path.startswith("http") and settings.aws_s3_bucket_name:
-            storage = GCSStorageService()
-            # Extract the S3 key from the full URL
+        # S3 stored file
+        if file_path.startswith("http") and storage.is_s3_available:
             prefix = f"{settings.aws_endpoint_url}/{settings.aws_s3_bucket_name}/"
             if file_path.startswith(prefix):
                 s3_key = file_path[len(prefix):]
             else:
-                # Fallback: extract path after bucket name
                 parts = file_path.split(f"/{settings.aws_s3_bucket_name}/", 1)
                 s3_key = parts[1] if len(parts) > 1 else file_path
+            obj = storage._s3.get_object(Bucket=settings.aws_s3_bucket_name, Key=s3_key)
+            return obj["Body"].read(), attachment.file_name, attachment.file_type
 
-            obj = storage._s3.get_object(
-                Bucket=settings.aws_s3_bucket_name,
-                Key=s3_key,
-            )
-            content = obj["Body"].read()
-            return content, attachment.file_name, attachment.file_type
+        # GCS stored file (gs://bucket/path)
+        if file_path.startswith("gs://") and storage.is_gcs_available:
+            gcs_path = file_path.replace(f"gs://{settings.gcs_bucket_name}/", "")
+            bucket = storage._gcs.bucket(settings.gcs_bucket_name)
+            blob = bucket.blob(gcs_path)
+            return blob.download_as_bytes(), attachment.file_name, attachment.file_type
 
         # Local file fallback
         local = Path(file_path.lstrip("/"))
