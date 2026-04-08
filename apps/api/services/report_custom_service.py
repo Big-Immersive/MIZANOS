@@ -40,6 +40,7 @@ class ReportCustomService:
         include_bugs: bool = False,
     ) -> dict[UUID, dict]:
         svc = ReportService(self.session)
+        task_counts = await svc._fetch_task_counts(product_ids)
         links_map = await svc._fetch_project_links(product_ids)
         code_progress = await svc._fetch_code_progress_batch(product_ids)
         members_map = await svc._fetch_members_map(product_ids)
@@ -61,12 +62,17 @@ class ReportCustomService:
                 for status_name, bugs in bug_groups.items():
                     milestones[f"Bugs — {status_name.replace('_', ' ').title()}"] = bugs
 
-            # Build summary
-            task_count = sum(len(t) for k, t in milestones.items() if not k.startswith("Bugs"))
+            # Build summary with total + breakdown
+            tc = task_counts.get(pid, {})
+            total = sum(tc.values())
+            done = sum(tc.get(s, 0) for s in COMPLETED_STATUSES)
+            in_prog = sum(tc.get(s, 0) for s in {"in_progress", "in_review", "review"})
+            backlog = total - done - in_prog
+            filtered_count = sum(len(t) for k, t in milestones.items() if not k.startswith("Bugs"))
             bug_count = sum(len(t) for k, t in milestones.items() if k.startswith("Bugs"))
             cp = code_progress.get(pid, 0.0)
-            status_labels = ", ".join(s.replace("_", " ").title() for s in task_statuses)
-            summary = f"Tasks: {task_count} ({status_labels})"
+
+            summary = f"Tasks: {total} total | {done} Done | {in_prog} In Progress | {backlog} Backlog"
             if include_bugs:
                 summary += f" | Bugs: {bug_count}"
             summary += f" | Code Progress: {cp}%"
