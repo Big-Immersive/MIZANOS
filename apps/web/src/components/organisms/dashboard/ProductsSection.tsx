@@ -77,6 +77,7 @@ export function ProductsSection({ filterProductIds }: ProductsSectionProps) {
         onViewModeChange={setViewMode}
       />
 
+      <div className="flex items-center gap-2 flex-wrap">
       <ProductsFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -91,6 +92,7 @@ export function ProductsSection({ filterProductIds }: ProductsSectionProps) {
         hasActiveFilters={hasActiveFilters}
         onClearFilters={clearFilters}
       />
+      </div>
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-10">
