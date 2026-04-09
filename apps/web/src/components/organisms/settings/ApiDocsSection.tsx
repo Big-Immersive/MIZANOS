@@ -88,8 +88,21 @@ Body: any fields to update
 ### Delete Milestone
 DELETE /products/milestones/{milestone_id}
 
-### List Team Members (to find assignee_id)
+### List Team Members (to find assignee_id / profile_id)
 GET /products/{product_id}/members
+
+### Add Member to Project (superadmin/PM only)
+POST /products/{product_id}/members
+Body: {
+  "profile_id": "uuid of the user to add",
+  "role": "ai_engineer | project_manager | business_owner | marketing"
+}
+
+### Remove Member from Project
+DELETE /products/{product_id}/members/{member_id}
+
+### List All Members Across Projects (to find profile_id)
+GET /products/all-members
 
 ## Task Statuses
 - backlog, in_progress, review, done, live, cancelled
@@ -118,6 +131,15 @@ curl -X PATCH ${API_BASE}/tasks/task-uuid \\
   -H "X-API-Key: mizan_key_your_key" \\
   -H "Content-Type: application/json" \\
   -d '{"status":"in_progress"}'
+
+## Example: Add member to project (superadmin/PM)
+curl -X POST ${API_BASE}/products/project-uuid/members \\
+  -H "X-API-Key: mizan_key_your_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"profile_id":"user-profile-uuid","role":"ai_engineer"}'
+
+## Project Member Roles
+- ai_engineer, project_manager, business_owner, marketing
 
 ## Example: Create a bug
 curl -X POST ${API_BASE}/tasks \\
