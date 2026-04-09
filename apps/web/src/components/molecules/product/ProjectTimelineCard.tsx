@@ -12,8 +12,7 @@ interface ProjectTimelineCardProps {
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "Not set";
-  const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  return new Date(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function getDaysRemaining(endDate: string | null): { days: number; percent: number } | null {
