@@ -46,8 +46,8 @@ class TaskService(BaseService[Task]):
         """List tasks with optional filtering. Excludes drafts by default."""
         base = select(Task).where(Task.task_type == task_type)
 
-        # Non-admin users only see tasks from projects they're members of
-        if user and not user.has_any_role(AppRole.SUPERADMIN, AppRole.ADMIN):
+        # API key users (non-admin) only see tasks from their member projects
+        if user and user.is_api_key and not user.has_any_role(AppRole.SUPERADMIN, AppRole.ADMIN):
             user_products = select(ProductMember.product_id).where(
                 ProductMember.profile_id == user.profile_id
             )
@@ -395,7 +395,9 @@ class TaskService(BaseService[Task]):
         )
 
     async def _verify_project_membership(self, product_id: UUID, user: AuthenticatedUser) -> None:
-        """Ensure user is a member of the project. Superadmins bypass."""
+        """Ensure API key user is a member of the project. JWT users and admins bypass."""
+        if not user.is_api_key:
+            return
         if user.has_any_role(AppRole.SUPERADMIN, AppRole.ADMIN):
             return
         stmt = select(ProductMember.id).where(

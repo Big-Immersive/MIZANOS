@@ -20,6 +20,8 @@ export interface Product {
   created_by: string | null;
   created_by_name: string | null;
   archived_at: string | null;
+  start_date: string | null;
+  end_date: string | null;
   tasks_locked: boolean;
   task_count: number;
   bug_count: number;

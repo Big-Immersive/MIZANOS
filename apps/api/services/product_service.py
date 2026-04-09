@@ -85,8 +85,8 @@ class ProductService(BaseService[Product]):
 
         stmt = select(Product)
 
-        # Project-level access: non-admin users see only projects they're members of
-        if user and not user.has_any_role(AppRole.SUPERADMIN, AppRole.ADMIN):
+        # Project-level access: API key users (non-admin) see only their member projects
+        if user and user.is_api_key and not user.has_any_role(AppRole.SUPERADMIN, AppRole.ADMIN):
             member_pids = select(ProductMember.product_id).where(
                 ProductMember.profile_id == user.profile_id
             )

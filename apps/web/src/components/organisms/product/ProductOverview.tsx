@@ -19,6 +19,7 @@ import { DevelopmentHealthSection } from "./DevelopmentHealthSection";
 import { ExternalDocumentsOverview } from "./ExternalDocumentsOverview";
 import { ScanProgressCard } from "@/components/molecules/indicators/ScanProgressCard";
 import type { ProductStage } from "@/lib/constants";
+import { ProjectTimelineCard } from "@/components/molecules/product/ProjectTimelineCard";
 import { FileText, Users } from "lucide-react";
 
 interface ProductOverviewProps {
@@ -190,6 +191,8 @@ function ProductOverview({ productId }: ProductOverviewProps) {
           canChangeStage={isProjectManager || isSuperAdmin}
         />
       </div>
+
+      <ProjectTimelineCard product={product} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TeamCard members={members} />

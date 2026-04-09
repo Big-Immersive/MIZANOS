@@ -37,6 +37,12 @@ class Product(Base, UUIDMixin, TimestampMixin):
     archived_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    start_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    end_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     tasks_locked: Mapped[bool] = mapped_column(
         Boolean, server_default="false", nullable=False
     )

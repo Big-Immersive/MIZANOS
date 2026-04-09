@@ -46,6 +46,8 @@ class ProductUpdate(BaseSchema):
     github_repo_error: str | None = None
     tracked_branch: str | None = None
     source_type: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
 
 
 class ProductResponse(ProductBase):
@@ -58,6 +60,8 @@ class ProductResponse(ProductBase):
     created_by: UUID | None = None
     created_by_name: str | None = None
     archived_at: datetime | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     tasks_locked: bool = False
     task_count: int = 0
     bug_count: int = 0
