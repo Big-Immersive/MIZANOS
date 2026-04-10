@@ -34,6 +34,8 @@ export function toKanbanTask(
     createdBy: task.created_by ?? undefined,
     productId: task.product_id,
     dueDate: task.due_date ?? undefined,
+    startDate: task.start_date ?? undefined,
+    endDate: task.end_date ?? undefined,
     commentCount: task.comment_count ?? 0,
     replyCount: task.reply_count ?? 0,
     createdAt: task.created_at,

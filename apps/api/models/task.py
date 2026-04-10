@@ -43,6 +43,12 @@ class Task(Base, UUIDMixin, TimestampMixin):
     due_date: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    start_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    end_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     sort_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     estimated_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     generation_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)

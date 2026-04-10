@@ -11,6 +11,8 @@ export interface Task {
   priority: string | null;
   pillar: string | null;
   due_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
   sort_order: number | null;
   estimated_hours: number | null;
   generation_source: string | null;
@@ -74,6 +76,8 @@ export interface KanbanTask {
   createdBy?: string;
   productId?: string;
   dueDate?: string;
+  startDate?: string;
+  endDate?: string;
   commentCount: number;
   replyCount: number;
   createdAt: string;

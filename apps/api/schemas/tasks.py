@@ -15,6 +15,8 @@ class TaskBase(BaseSchema):
     priority: str = "medium"
     pillar: str | None = None
     due_date: datetime | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     estimated_hours: float | None = None
     sort_order: int | None = 0
     generation_source: str | None = None
@@ -46,6 +48,8 @@ class TaskUpdate(BaseSchema):
     assignee_id: UUID | None = None
     milestone_id: UUID | None = None
     due_date: datetime | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     estimated_hours: float | None = None
     sort_order: int | None = None
     generation_source: str | None = None
