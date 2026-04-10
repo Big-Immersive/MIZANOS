@@ -34,6 +34,8 @@ const taskSchema = z.object({
   priority: z.enum(["low", "medium", "high", "critical", "production_bug"]),
   status: z.string(),
   due_date: z.string().optional(),
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
   assignee_id: z.string().optional(),
   milestone_id: z.string().optional(),
 });
@@ -141,7 +143,7 @@ export function TaskDetailDrawer({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: "", description: "", pillar: "development",
-      priority: "medium", status: "backlog", due_date: "", assignee_id: "", milestone_id: "",
+      priority: "medium", status: "backlog", due_date: "", start_date: "", end_date: "", assignee_id: "", milestone_id: "",
     },
   });
 
@@ -154,6 +156,8 @@ export function TaskDetailDrawer({
         priority: task.priority,
         status: task.status,
         due_date: task.dueDate?.slice(0, 10) ?? "",
+        start_date: task.startDate?.slice(0, 10) ?? "",
+        end_date: task.endDate?.slice(0, 10) ?? "",
         assignee_id: task.assigneeId ?? "__none__",
         milestone_id: task.milestoneId ?? "",
       });
@@ -163,7 +167,7 @@ export function TaskDetailDrawer({
   const onFormSubmit = (values: TaskFormValues) => {
     if (!task) return;
     const base = { id: task.id, status: values.status };
-    const details = { title: values.title, description: values.description ?? null, pillar: values.pillar, priority: values.priority, due_date: values.due_date || null, milestone_id: values.milestone_id || null };
+    const details = { title: values.title, description: values.description ?? null, pillar: values.pillar, priority: values.priority, due_date: values.due_date || null, start_date: values.start_date || null, end_date: values.end_date || null, milestone_id: values.milestone_id || null };
     const payload = canManageTasks
       ? { ...base, ...details, assignee_id: values.assignee_id === "__none__" ? null : (values.assignee_id ?? null) }
       : isCreator ? { ...base, ...details } : base;
@@ -286,19 +290,34 @@ export function TaskDetailDrawer({
                   </div>
                 </div>
 
-                {!isAIEngineerOnly && currentStatus === "done" && task?.updatedAt && (
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <BaseLabel>Done Date</BaseLabel>
-                    <p className="text-sm text-foreground rounded-md border px-3 py-2">
-                      {new Date(task.updatedAt).toDateString() === new Date().toDateString()
-                        ? "Today"
-                        : new Date(task.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                    <BaseLabel htmlFor="drawer-start">Start Date</BaseLabel>
+                    <BaseInput id="drawer-start" type="date" {...register("start_date")} />
+                  </div>
+                  <div className="space-y-1">
+                    <BaseLabel htmlFor="drawer-end">End Date</BaseLabel>
+                    <BaseInput id="drawer-end" type="date" {...register("end_date")} />
+                  </div>
+                </div>
+
+                {watch("start_date") && watch("end_date") && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Time taken: <span className="font-medium text-foreground">
+                        {Math.max(0, Math.ceil((new Date(watch("end_date")!).getTime() - new Date(watch("start_date")!).getTime()) / (1000 * 60 * 60 * 24)))} days
+                      </span>
+                      {watch("due_date") && new Date(watch("end_date")!) <= new Date(watch("due_date")!) && (
+                        <span className="text-emerald-500 ml-1">
+                          ({Math.ceil((new Date(watch("due_date")!).getTime() - new Date(watch("end_date")!).getTime()) / (1000 * 60 * 60 * 24))} days before deadline)
+                        </span>
+                      )}
+                      {watch("due_date") && new Date(watch("end_date")!) > new Date(watch("due_date")!) && (
+                        <span className="text-destructive ml-1">
+                          ({Math.ceil((new Date(watch("end_date")!).getTime() - new Date(watch("due_date")!).getTime()) / (1000 * 60 * 60 * 24))} days overdue)
+                        </span>
+                      )}
                     </p>
-                    {task.dueDate && new Date(task.updatedAt).toDateString() !== new Date(task.dueDate).toDateString() && new Date(task.updatedAt).setHours(0,0,0,0) > new Date(task.dueDate).setHours(0,0,0,0) && (
-                      <p className="text-xs text-destructive font-medium">
-                        Task was completed after due date
-                      </p>
-                    )}
                   </div>
                 )}
               </>
