@@ -95,23 +95,27 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
             f"Tasks: {done}/{len(tasks)}{bug_info}{scan_info}"
         )
 
-        # List incomplete tasks with assignee (done tasks just counted)
-        done_tasks = [t for t in tasks if t.status in ("done", "live")]
-        active_tasks = [t for t in tasks if t.status not in ("done", "live")]
-        if done_tasks:
-            done_names = ", ".join(t.title for t in done_tasks[:10])
-            proj_lines.append(f"    Done({len(done_tasks)}): {done_names}{'...' if len(done_tasks) > 10 else ''}")
-        for t in active_tasks:
-            a = ""
-            if t.assignee_id:
-                ap = profile_map.get(t.assignee_id)
-                a = f"|{ap.full_name}" if ap and ap.full_name else ""
-            proj_lines.append(f"    [{t.status or 'backlog'}] {t.title}{a}")
+        # Pre-grouped tasks by status (AI reads facts, doesn't compute)
+        if tasks:
+            task_by_status: dict[str, list[str]] = {}
+            for t in tasks:
+                s = t.status or "backlog"
+                a = ""
+                if t.assignee_id:
+                    ap = profile_map.get(t.assignee_id)
+                    a = f" ({ap.full_name})" if ap and ap.full_name else ""
+                task_by_status.setdefault(s, []).append(f"{t.title}{a}")
+            for s, titles in task_by_status.items():
+                proj_lines.append(f"    Tasks[{s}]({len(titles)}): {', '.join(titles[:10])}{'...' if len(titles) > 10 else ''}")
 
-        # Compact bug list
+        # Pre-grouped bugs by status
         if bugs:
+            bug_by_status: dict[str, list[str]] = {}
             for b in bugs:
-                proj_lines.append(f"    BUG[{b.status or 'reported'}] {b.title}")
+                s = b.status or "reported"
+                bug_by_status.setdefault(s, []).append(b.title)
+            for s, titles in bug_by_status.items():
+                proj_lines.append(f"    Bugs[{s}]({len(titles)}): {', '.join(titles)}")
 
     stage_str = ", ".join(f"{k}: {v}" for k, v in sorted(stages.items()))
     proj_lines.insert(1, f"Stages: {stage_str}")
