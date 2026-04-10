@@ -132,7 +132,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
             api_key=api_key,
             base_url=default_base_url,
             model=default_model,
-            temperature=0.3,
+            temperature=0.1,
             max_tokens=1024,
         )
 
@@ -147,7 +147,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
     elif provider == "openrouter":
         base_url = "https://openrouter.ai/api/v1"
 
-    temperature = org_cfg.get("temperature", 0.3)
+    temperature = org_cfg.get("temperature", 0.1)
     if not isinstance(temperature, (int, float)) or not (0.0 <= temperature <= 2.0):
         temperature = 0.3
 

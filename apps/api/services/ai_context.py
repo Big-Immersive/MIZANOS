@@ -31,10 +31,7 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         role = p.role or "member"
         members_by_role.setdefault(role, []).append(p.full_name or p.email or "Unknown")
 
-    team_lines = [f"TEAM: {len(profiles)} members"]
-    for role, names in sorted(members_by_role.items()):
-        team_lines.append(f"  {role} ({len(names)}): {', '.join(names)}")
-    sections.append("\n".join(team_lines))
+    sections.append(f"TEAM: {len(profiles)} active members")
 
     # --- All Projects ---
     products = list((await session.execute(
@@ -87,9 +84,6 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         total_done += done
         total_bugs += len(bugs)
 
-        team = member_map.get(str(p.id), [])
-        team_str = " | Team: " + ", ".join(f"{n} ({r})" for n, r in team) if team else ""
-
         scan_info = ""
         scan = scans_by_product.get(str(p.id))
         if scan and scan.gap_analysis and isinstance(scan.gap_analysis, dict):
@@ -98,13 +92,53 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         bug_info = f" | Bugs: {len(bugs)}" if bugs else ""
         proj_lines.append(
             f"  [{p.name}] Stage: {p.stage or 'N/A'} | "
-            f"Tasks: {done}/{len(tasks)}{bug_info}{scan_info}{team_str}"
+            f"Tasks: {done}/{len(tasks)}{bug_info}{scan_info}"
         )
+
+        # List incomplete tasks with assignee (done tasks just counted)
+        done_tasks = [t for t in tasks if t.status in ("done", "live")]
+        active_tasks = [t for t in tasks if t.status not in ("done", "live")]
+        if done_tasks:
+            done_names = ", ".join(t.title for t in done_tasks[:10])
+            proj_lines.append(f"    Done({len(done_tasks)}): {done_names}{'...' if len(done_tasks) > 10 else ''}")
+        for t in active_tasks:
+            a = ""
+            if t.assignee_id:
+                ap = profile_map.get(t.assignee_id)
+                a = f"|{ap.full_name}" if ap and ap.full_name else ""
+            proj_lines.append(f"    [{t.status or 'backlog'}] {t.title}{a}")
+
+        # Compact bug list
+        if bugs:
+            for b in bugs:
+                proj_lines.append(f"    BUG[{b.status or 'reported'}] {b.title}")
 
     stage_str = ", ".join(f"{k}: {v}" for k, v in sorted(stages.items()))
     proj_lines.insert(1, f"Stages: {stage_str}")
     proj_lines.insert(2, f"Total: {total_done}/{total_tasks} tasks done, {total_bugs} bugs")
     sections.append("\n".join(proj_lines))
+
+    # --- Pre-computed Member-to-Project Summaries (prevents LLM miscounting) ---
+    role_project_map: dict[str, dict[str, list[str]]] = {}
+    product_name_map = {str(p.id): p.name for p in products}
+    for m in all_members:
+        profile = profile_map.get(m.profile_id)
+        if not profile:
+            continue
+        name = profile.full_name or profile.email or "Unknown"
+        role = m.role or "member"
+        role_project_map.setdefault(role, {}).setdefault(name, []).append(
+            product_name_map.get(str(m.product_id), "Unknown")
+        )
+
+    summary_lines = ["MEMBER-PROJECT SUMMARY (pre-computed, use these facts):"]
+    for role in sorted(role_project_map.keys()):
+        members_in_role = role_project_map[role]
+        sorted_members = sorted(members_in_role.items(), key=lambda x: -len(x[1]))
+        summary_lines.append(f"  {role} ({len(members_in_role)} people):")
+        for name, projs in sorted_members:
+            summary_lines.append(f"    {name}: {len(projs)} projects — {', '.join(projs)}")
+    sections.append("\n".join(summary_lines))
 
     return (
         "\n\n--- APPLICATION CONTEXT (complete knowledge) ---\n"
@@ -135,6 +169,16 @@ async def _gather_single_project_context(session: AsyncSession, product_id: UUID
     task_stmt = select(Task).where(Task.product_id == product_id, Task.is_draft == False)
     tasks = list((await session.execute(task_stmt)).scalars().all())
     if tasks:
+        # Build assignee name map
+        from apps.api.models.user import Profile
+        assignee_ids = {t.assignee_id for t in tasks if t.assignee_id}
+        profile_map: dict = {}
+        if assignee_ids:
+            profiles = list((await session.execute(
+                select(Profile).where(Profile.id.in_(assignee_ids))
+            )).scalars().all())
+            profile_map = {p.id: p.full_name or p.email or "Unknown" for p in profiles}
+
         by_status: dict[str, int] = {}
         overdue = 0
         from datetime import datetime, timezone
@@ -158,20 +202,34 @@ async def _gather_single_project_context(session: AsyncSession, product_id: UUID
         for t in tasks:
             priority = f" [{t.priority}]" if t.priority else ""
             due = f" (due {t.due_date.strftime('%m/%d')})" if t.due_date else ""
-            task_lines.append(f"  - [{t.status or 'backlog'}]{priority} {t.title}{due}")
+            assignee = f" | {profile_map[t.assignee_id]}" if t.assignee_id and t.assignee_id in profile_map else ""
+            task_lines.append(f"  - [{t.status or 'backlog'}]{priority} {t.title}{due}{assignee}")
         context_parts.append("Task list:\n" + "\n".join(task_lines))
 
     # Bugs
     bug_stmt = select(Task).where(Task.product_id == product_id, Task.task_type == "bug")
     bugs = list((await session.execute(bug_stmt)).scalars().all())
     if bugs:
+        # Build bug assignee map
+        if not tasks:
+            profile_map = {}
+        bug_assignee_ids = {b.assignee_id for b in bugs if b.assignee_id} - set(profile_map.keys())
+        if bug_assignee_ids:
+            from apps.api.models.user import Profile as BugProfile
+            bug_profiles = list((await session.execute(
+                select(BugProfile).where(BugProfile.id.in_(bug_assignee_ids))
+            )).scalars().all())
+            for p in bug_profiles:
+                profile_map[p.id] = p.full_name or p.email or "Unknown"
+
         bug_status: dict[str, int] = {}
         bug_lines = []
         for b in bugs:
             s = b.status or "reported"
             bug_status[s] = bug_status.get(s, 0) + 1
             priority = f" [{b.priority}]" if b.priority else ""
-            bug_lines.append(f"  - [{s}]{priority} {b.title}")
+            assignee = f" | Assigned: {profile_map[b.assignee_id]}" if b.assignee_id and b.assignee_id in profile_map else ""
+            bug_lines.append(f"  - [{s}]{priority} {b.title}{assignee}")
         context_parts.append(
             f"\nBUGS ({len(bugs)} total):\n"
             f"Status: {', '.join(f'{k}: {v}' for k, v in sorted(bug_status.items()))}\n"
