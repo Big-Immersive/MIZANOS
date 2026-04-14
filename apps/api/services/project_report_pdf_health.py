@@ -1,8 +1,4 @@
-"""PDF rendering helpers for Development Health and AI Insights sections.
-
-Split from project_report_pdf_sections.py to keep each file under the
-300 LOC ceiling.
-"""
+"""PDF rendering + scoring helpers for Development Health and AI Insights."""
 
 from fpdf import FPDF
 
@@ -10,6 +6,66 @@ from apps.api.services.project_report_pdf_sections import (
     AMBER, DARK, GREEN, GREY, NAVY, RED, _heading, _maybe_break,
 )
 from apps.api.services.report_pdf_service import _sanitize_text
+
+
+def compute_dev_health(scan_result, audit, analysis) -> dict:
+    """Mirror the frontend DevelopmentHealthSection score calculation."""
+    ga = (scan_result.gap_analysis if scan_result and scan_result.gap_analysis else None) or {}
+    inventory = (scan_result.functional_inventory if scan_result and scan_result.functional_inventory else None) or []
+    has_scan = bool(ga)
+
+    spec = 0
+    if isinstance(ga, dict):
+        if isinstance(ga.get("progress_pct"), (int, float)):
+            spec = round(ga["progress_pct"])
+        elif ga.get("total_tasks") and isinstance(ga.get("verified"), (int, float)):
+            spec = round((ga["verified"] / ga["total_tasks"]) * 100)
+    if spec == 0 and analysis and getattr(analysis, "overall_score", None):
+        spec = round(analysis.overall_score)
+
+    quality = 0
+    if isinstance(inventory, list) and inventory:
+        total = len(inventory)
+        avg_conf = sum(float(e.get("confidence", 0) or 0) for e in inventory if isinstance(e, dict)) / total
+        with_artifacts = sum(1 for e in inventory if isinstance(e, dict) and e.get("artifacts_found"))
+        quality = round(avg_conf * 60 + (with_artifacts / total) * 40)
+    if quality == 0 and audit and getattr(audit, "overall_score", None):
+        quality = round(audit.overall_score)
+
+    tech_stack = (analysis.tech_stack if analysis and isinstance(analysis.tech_stack, dict) else {}) or {}
+    score = 0
+    checks = 5
+    if tech_stack.get("description"):
+        score += 1
+    try:
+        if int(tech_stack.get("contributors", 0) or 0) > 1:
+            score += 1
+    except (TypeError, ValueError):
+        pass
+    file_count = (scan_result.file_count if scan_result and scan_result.file_count else 0) or 0
+    if file_count > 10:
+        score += 1
+    if isinstance(ga, dict) and ga.get("total_tasks"):
+        no_ev_ratio = float(ga.get("no_evidence", 0) or 0) / float(ga["total_tasks"])
+        if no_ev_ratio < 0.3:
+            score += 1
+        if (ga.get("verified") or 0) > 0:
+            score += 1
+    standards = round((score / checks) * 100)
+
+    overall = round(spec * 0.4 + quality * 0.35 + standards * 0.25)
+    last_scan_at = None
+    if scan_result and getattr(scan_result, "created_at", None):
+        last_scan_at = scan_result.created_at.strftime("%d %b %Y")
+    return {
+        "spec_alignment": spec,
+        "code_quality": quality,
+        "standards": standards,
+        "overall": overall,
+        "spec_label": "tasks verified" if has_scan else "from analysis",
+        "quality_label": "evidence quality" if has_scan else "audit score",
+        "last_scan_at": last_scan_at,
+    }
 
 
 def add_development_health(pdf: FPDF, scores: dict) -> None:
@@ -88,4 +144,4 @@ def add_ai_insights(pdf: FPDF, ai_analysis: dict | None) -> None:
         pdf.ln(1)
 
 
-__all__ = ["add_development_health", "add_ai_insights"]
+__all__ = ["add_development_health", "add_ai_insights", "compute_dev_health"]

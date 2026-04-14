@@ -30,12 +30,12 @@ def add_overview_and_members(pdf: FPDF, product: Any, members: list[dict]) -> No
     left_x = pdf.l_margin
     right_x = pdf.l_margin + col_w + 6
 
-    # --- Description spans above the two columns (left-side width) ---
+    # --- Description spans the full content width above the two columns ---
     pdf.set_xy(left_x, start_y)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(*DARK)
     if product.description:
-        pdf.multi_cell(col_w, 5, _sanitize_text(product.description), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(content_w, 5, _sanitize_text(product.description), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(1)
     fields_start_y = pdf.get_y()
 

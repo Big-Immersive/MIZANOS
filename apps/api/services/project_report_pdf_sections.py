@@ -5,11 +5,10 @@ the 300 LOC limit and each function has a single rendering responsibility.
 """
 
 from datetime import datetime, timezone
-from typing import Any
 
 from fpdf import FPDF
 
-from apps.api.services.report_pdf_service import _sanitize_text, _shorten
+from apps.api.services.report_pdf_service import _sanitize_text
 
 NAVY = (31, 73, 125)
 GREY = (100, 100, 100)
@@ -47,32 +46,6 @@ def add_title(pdf: FPDF, project_name: str) -> None:
     pdf.set_draw_color(200, 200, 200)
     pdf.line(pdf.l_margin, pdf.get_y() + 2, pdf.w - pdf.r_margin, pdf.get_y() + 2)
     pdf.ln(8)
-
-
-def add_overview(pdf: FPDF, product: Any) -> None:
-    _heading(pdf, "Project Overview")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(*DARK)
-    if product.description:
-        pdf.set_x(pdf.l_margin)
-        pdf.multi_cell(0, 5, _sanitize_text(product.description), new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(2)
-
-    rows = [
-        ("Stage", product.stage or "-"),
-        ("Pillar", product.pillar or "-"),
-        ("Start Date", product.start_date.strftime("%d %b %Y") if product.start_date else "-"),
-        ("End Date", product.end_date.strftime("%d %b %Y") if product.end_date else "-"),
-        ("Created", product.created_at.strftime("%d %b %Y") if product.created_at else "-"),
-    ]
-    for label, value in rows:
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.set_text_color(*GREY)
-        pdf.cell(35, 6, f"{label}:")
-        pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(*DARK)
-        pdf.cell(0, 6, _sanitize_text(str(value)), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
 
 
 def _status_color(status: str) -> tuple[int, int, int]:
@@ -131,42 +104,45 @@ def add_milestones(pdf: FPDF, milestones: list[dict]) -> None:
     pdf.ln(2)
 
 
-def add_stage_progress(pdf: FPDF, current_stage: str | None) -> None:
-    _heading(pdf, "Stage Progress")
-    track = ["Intake", "Development", "QA", "Security", "Dev Ready", "Soft Launch", "Launched"]
-    idx = track.index(current_stage) if current_stage in track else -1
-    pdf.set_font("Helvetica", "", 9)
-    for i, s in enumerate(track):
-        if i < idx:
-            marker, color = "[x]", GREEN
-        elif i == idx:
-            marker, color = "[>]", NAVY
-        else:
-            marker, color = "[ ]", GREY
-        pdf.set_text_color(*color)
-        pdf.cell(0, 5, f"  {marker} {s}{' (current)' if i == idx else ''}", new_x="LMARGIN", new_y="NEXT")
-    if current_stage == "On Hold":
-        pdf.set_text_color(*AMBER)
-        pdf.cell(0, 6, "  Project is currently On Hold.", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
-
-
-def add_members(pdf: FPDF, members: list[dict]) -> None:
+def add_milestones_with_status_breakdown(pdf: FPDF, milestones: list[dict]) -> None:
+    """Like add_milestones, but inlines per-status task counts under each row."""
     _maybe_break(pdf, 30)
-    _heading(pdf, f"Team Members ({len(members)})")
-    if not members:
+    _heading(pdf, f"Milestones ({len(milestones)})")
+    if not milestones:
         pdf.set_font("Helvetica", "I", 9)
         pdf.set_text_color(*GREY)
-        pdf.cell(0, 6, "No members assigned.", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 6, "No milestones defined.", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
         return
-    pdf.set_font("Helvetica", "", 9)
-    for m in members:
-        _maybe_break(pdf, 12)
+    for m in milestones:
+        _maybe_break(pdf, 18)
+        pct = int(m.get("pct", 0))
+        pct_color = GREEN if pct >= 80 else AMBER if pct >= 40 else RED
+        pdf.set_font("Helvetica", "B", 10)
         pdf.set_text_color(*DARK)
-        pdf.cell(80, 6, _sanitize_text(m["name"])[:40])
+        pdf.cell(0, 6, _sanitize_text(m.get("title", "Untitled"))[:80], new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*GREY)
-        pdf.cell(0, 6, ", ".join(m["roles"]), new_x="LMARGIN", new_y="NEXT")
+        due_label = m.get("due_date") or "No due date"
+        pdf.cell(70, 5, f"  Due: {due_label}")
+        pdf.cell(40, 5, f"Tasks: {m.get('done', 0)}/{m.get('total', 0)}")
+        pdf.set_text_color(*pct_color)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, f"{pct}% complete", new_x="LMARGIN", new_y="NEXT")
+        breakdown = m.get("status_breakdown") or {}
+        if breakdown:
+            pdf.set_x(pdf.l_margin)
+            pdf.set_font("Helvetica", "", 8)
+            for status, count in sorted(breakdown.items()):
+                if not count:
+                    continue
+                label = status.replace("_", " ").title()
+                pdf.set_text_color(*GREY)
+                pdf.cell(pdf.get_string_width("  "), 5, "  ")
+                pdf.set_text_color(*_status_color(status))
+                pdf.cell(pdf.get_string_width(f"{label}: {count}") + 4, 5, f"{label}: {count}")
+            pdf.ln(5)
+        pdf.ln(1)
     pdf.ln(2)
 
 
@@ -188,62 +164,46 @@ def add_status_summary(pdf: FPDF, label: str, counts: dict[str, int], total: int
     pdf.ln(2)
 
 
-def add_audit_section(pdf: FPDF, audit) -> None:
-    _maybe_break(pdf, 35)
-    _heading(pdf, "Latest Audit")
-    if not audit:
-        pdf.set_font("Helvetica", "I", 9)
-        pdf.set_text_color(*GREY)
-        pdf.cell(0, 6, "No audits run for this project yet.", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(2)
-        return
-    score = round(audit.overall_score)
-    color = GREEN if score >= 80 else AMBER if score >= 60 else RED
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(*color)
-    pdf.cell(0, 7, f"Overall Score: {score} / 100", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 8)
+def add_global_cover(pdf: FPDF, products: list) -> None:
+    """Cover page for the global multi-project report."""
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(*DARK)
+    pdf.cell(0, 14, "Mizan OS - Global Project Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 12)
     pdf.set_text_color(*GREY)
-    pdf.cell(0, 5, f"Run on {audit.run_at.strftime('%d %b %Y, %H:%M')}", new_x="LMARGIN", new_y="NEXT")
-    if isinstance(audit.categories, dict) and audit.categories:
-        pdf.ln(1)
-        pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(
+        0, 8,
+        datetime.now(timezone.utc).strftime("Generated %d %B %Y"),
+        new_x="LMARGIN", new_y="NEXT",
+    )
+    pdf.ln(4)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
+    pdf.ln(8)
+
+    _heading(pdf, f"Portfolio Summary ({len(products)} projects)")
+    stage_counts: dict[str, int] = {}
+    for p in products:
+        stage_counts[p.stage or "Unknown"] = stage_counts.get(p.stage or "Unknown", 0) + 1
+    pdf.set_font("Helvetica", "", 10)
+    for stage, count in sorted(stage_counts.items()):
         pdf.set_text_color(*GREY)
-        pdf.cell(0, 5, "Category breakdown:", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 9)
-        for k, v in audit.categories.items():
-            try:
-                cat_score = round(float(v))
-            except (TypeError, ValueError):
-                continue
-            pdf.set_text_color(*GREY)
-            pdf.cell(60, 5, f"  {str(k).replace('_', ' ').title()}:")
-            cat_color = GREEN if cat_score >= 80 else AMBER if cat_score >= 60 else RED
-            pdf.set_text_color(*cat_color)
-            pdf.cell(0, 5, str(cat_score), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
+        pdf.cell(60, 6, f"  {stage}:")
+        pdf.set_text_color(*DARK)
+        pdf.cell(0, 6, str(count), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
 
-
-def add_code_progress(pdf: FPDF, scan_pct: float, github: dict | None) -> None:
-    _maybe_break(pdf, 25)
-    _heading(pdf, "Code Progress Scan")
-    pdf.set_font("Helvetica", "B", 11)
+    _heading(pdf, "Projects in this report")
+    pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(*NAVY)
-    pdf.cell(0, 7, f"Feature completion: {scan_pct:.0f}%", new_x="LMARGIN", new_y="NEXT")
-    if github:
-        pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(*GREY)
-        pdf.cell(0, 5, f"Branch: {github.get('branch', '-')}", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(0, 5, f"Total commits: {github.get('total_commits', 0)}", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(0, 5, f"Today's commits: {github.get('today_commits', 0)}", new_x="LMARGIN", new_y="NEXT")
-        pdf.cell(0, 5, f"Contributors: {github.get('contributors_count', 0)}", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
+    for p in products:
+        stage = p.stage or "-"
+        pdf.cell(0, 5, f"  - {_sanitize_text(p.name)} ({stage})", new_x="LMARGIN", new_y="NEXT")
 
 
 __all__ = [
-    "add_title", "add_overview", "add_milestones", "add_project_links",
-    "add_stage_progress", "add_members", "add_status_summary", "add_audit_section",
-    "add_code_progress",
+    "add_title", "add_milestones", "add_milestones_with_status_breakdown",
+    "add_project_links", "add_status_summary", "add_global_cover",
     "AMBER", "DARK", "GREEN", "GREY", "NAVY", "RED",
     "_heading", "_maybe_break", "_status_color",
 ]

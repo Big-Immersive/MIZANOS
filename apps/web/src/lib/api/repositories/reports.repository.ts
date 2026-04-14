@@ -71,6 +71,14 @@ export class ReportsRepository {
     return response.data;
   }
 
+  async generateGlobalProjectsPDF(): Promise<Blob> {
+    const response = await this.client.get(
+      `${this.basePath}/projects/global/pdf`,
+      { responseType: "blob", timeout: 600_000 },
+    );
+    return response.data;
+  }
+
   async generatePDF(
     productIds: string[], reportType: string = "general",
     taskStatuses?: string[], includeBugs?: boolean,
