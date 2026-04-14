@@ -70,9 +70,13 @@ def add_project_links(pdf: FPDF, links: list[dict]) -> None:
         if not url:
             continue
         pdf.set_x(pdf.l_margin)
-        pdf.set_font("Helvetica", "BU", 10)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(*GREY)
+        label = f"  {name}: "
+        pdf.cell(pdf.get_string_width(label) + 1, 6, label)
+        pdf.set_font("Helvetica", "U", 9)
         pdf.set_text_color(5, 99, 193)
-        pdf.cell(0, 6, name, new_x="LMARGIN", new_y="NEXT", link=url)
+        pdf.cell(0, 6, _sanitize_text(url), new_x="LMARGIN", new_y="NEXT", link=url)
     pdf.ln(2)
 
 
