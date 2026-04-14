@@ -27,7 +27,10 @@ import {
   LayoutGrid,
   List,
   Archive,
+  FileBarChart2,
 } from "lucide-react";
+import { reportsRepository } from "@/lib/api/repositories";
+import { toast } from "sonner";
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +61,29 @@ export default function ProductsPage() {
     unarchiveProduct.mutate(productId, {
       onSettled: () => setRestoringId(null),
     });
+  };
+
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  const handleGenerateGlobalReport = async () => {
+    if (generatingReport) return;
+    setGeneratingReport(true);
+    try {
+      const blob = await reportsRepository.generateGlobalProjectsPDF();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Mizan_Global_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Global report downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate report");
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const pmNameMap = useMemo(() => {
@@ -134,14 +160,24 @@ export default function ProductsPage() {
           </Badge>
         }
       >
-        {canCreateProject && (
-          <Link href="/intake">
-            <Button className="shadow-sm hover:shadow-md transition-shadow">
-              <Plus className="h-4 w-4 mr-2" />
-              New Project
-            </Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleGenerateGlobalReport}
+            loading={generatingReport}
+          >
+            <FileBarChart2 className="h-4 w-4 mr-2" />
+            Generate Report
+          </Button>
+          {canCreateProject && (
+            <Link href="/intake">
+              <Button className="shadow-sm hover:shadow-md transition-shadow">
+                <Plus className="h-4 w-4 mr-2" />
+                New Project
+              </Button>
+            </Link>
+          )}
+        </div>
       </PageHeader>
 
       <div className="flex items-center gap-2 flex-wrap">

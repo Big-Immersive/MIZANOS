@@ -30,15 +30,17 @@ function HealthCard({
 }: {
   title: string;
   icon: typeof Activity;
-  score: number;
+  score: number | null;
   label: string;
 }) {
   const color =
-    score >= 80
-      ? "text-status-healthy"
-      : score >= 50
-        ? "text-status-warning"
-        : "text-status-critical";
+    score === null
+      ? "text-muted-foreground"
+      : score >= 80
+        ? "text-status-healthy"
+        : score >= 50
+          ? "text-status-warning"
+          : "text-status-critical";
 
   return (
     <Card>
@@ -49,20 +51,22 @@ function HealthCard({
         </div>
         <div className="flex items-end gap-2">
           <span className={`text-2xl font-bold tabular-nums ${color}`}>
-            {score}%
+            {score === null ? "N/A" : `${score}%`}
           </span>
           <span className="text-xs text-muted-foreground mb-1">{label}</span>
         </div>
         <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              score >= 80
-                ? "bg-status-healthy"
-                : score >= 50
-                  ? "bg-status-warning"
-                  : "bg-status-critical"
+              score === null
+                ? "bg-muted"
+                : score >= 80
+                  ? "bg-status-healthy"
+                  : score >= 50
+                    ? "bg-status-warning"
+                    : "bg-status-critical"
             }`}
-            style={{ width: `${score}%` }}
+            style={{ width: `${score ?? 0}%` }}
           />
         </div>
       </CardContent>
@@ -71,65 +75,48 @@ function HealthCard({
 }
 
 
-function computeSpecAlignment(scanResult: { gap_analysis?: { progress_pct?: number; verified?: number; total_tasks?: number } | null } | null | undefined): number {
-  if (!scanResult?.gap_analysis) return 0;
-  const ga = scanResult.gap_analysis;
+type ScanResult = { gap_analysis?: { progress_pct?: number; verified?: number; total_tasks?: number } | null; functional_inventory?: Array<{ confidence?: number; artifacts_found?: string[] }> | null; file_count?: number | null } | null | undefined;
+type AuditLite = { categories?: unknown } | null | undefined;
+
+function computeSpecAlignment(scanResult: ScanResult): number | null {
+  const ga = scanResult?.gap_analysis;
+  if (!ga) return null;
   if (typeof ga.progress_pct === "number") return Math.round(ga.progress_pct);
   if (ga.total_tasks && ga.total_tasks > 0 && typeof ga.verified === "number") {
     return Math.round((ga.verified / ga.total_tasks) * 100);
   }
-  return 0;
+  return null;
 }
 
-function computeCodeQuality(scanResult: { functional_inventory?: Array<{ confidence?: number; artifacts_found?: string[] }> | null; file_count?: number | null } | null | undefined): number {
-  if (!scanResult?.functional_inventory?.length) return 0;
-  const evidence = scanResult.functional_inventory;
+function computeCodeQuality(scanResult: ScanResult): number | null {
+  const evidence = scanResult?.functional_inventory;
+  if (!evidence?.length) return null;
   const totalTasks = evidence.length;
-  if (totalTasks === 0) return 0;
-
-  // Average confidence of task evidence (0-1 scale from LLM)
   const avgConfidence = evidence.reduce((sum, e) => sum + (e.confidence ?? 0), 0) / totalTasks;
-
-  // Artifact coverage: how many tasks have at least one artifact found
   const tasksWithArtifacts = evidence.filter((e) => e.artifacts_found && e.artifacts_found.length > 0).length;
   const artifactCoverage = tasksWithArtifacts / totalTasks;
-
-  // Weighted: 60% confidence + 40% artifact coverage
-  return Math.round((avgConfidence * 60 + artifactCoverage * 40));
+  return Math.round(avgConfidence * 60 + artifactCoverage * 40);
 }
 
-function computeStandards(scanResult: { gap_analysis?: { total_tasks?: number; verified?: number; partial?: number; no_evidence?: number } | null; file_count?: number | null } | null | undefined, analysis: { tech_stack?: unknown } | null | undefined): number {
-  const techStack = (typeof analysis?.tech_stack === "object" && analysis.tech_stack !== null ? analysis.tech_stack : {}) as Record<string, unknown>;
-  let score = 0;
-  let checks = 0;
+/**
+ * Standards = real audit `style` category score (LLM code review).
+ * Returns null when no audit has been run — caller shows "N/A" + a CTA.
+ */
+function computeStandards(audit: AuditLite): number | null {
+  if (!audit?.categories || typeof audit.categories !== "object") return null;
+  const style = (audit.categories as Record<string, unknown>).style;
+  if (typeof style !== "number") return null;
+  return Math.round(style);
+}
 
-  // Check 1: Has repo description (from GitHub analysis)
-  checks++;
-  if (techStack.description) score++;
-
-  // Check 2: Has multiple contributors
-  checks++;
-  const contributors = Number(techStack.contributors ?? 0);
-  if (contributors > 1) score++;
-
-  // Check 3: Reasonable file count (project has substance)
-  checks++;
-  const fileCount = scanResult?.file_count ?? 0;
-  if (fileCount > 10) score++;
-
-  // Check 4: Low no-evidence ratio (code covers most tasks)
-  checks++;
-  const ga = scanResult?.gap_analysis;
-  if (ga && ga.total_tasks && ga.total_tasks > 0) {
-    const noEvidenceRatio = (ga.no_evidence ?? 0) / ga.total_tasks;
-    if (noEvidenceRatio < 0.3) score++;
-  }
-
-  // Check 5: Has verified tasks (code actually maps to spec)
-  checks++;
-  if (ga && (ga.verified ?? 0) > 0) score++;
-
-  return checks > 0 ? Math.round((score / checks) * 100) : 0;
+function weightedOverall(spec: number | null, quality: number | null, standards: number | null): number | null {
+  const present: Array<[number, number]> = [];
+  if (spec !== null) present.push([spec, 0.4]);
+  if (quality !== null) present.push([quality, 0.35]);
+  if (standards !== null) present.push([standards, 0.25]);
+  if (present.length === 0) return null;
+  const totalWeight = present.reduce((s, [, w]) => s + w, 0);
+  return Math.round(present.reduce((s, [v, w]) => s + v * w, 0) / totalWeight);
 }
 
 export function DevelopmentHealthSection({
@@ -165,13 +152,14 @@ export function DevelopmentHealthSection({
     );
   }
 
-  // Use scan data for real scores, fall back to old analysis data
-  const specAlignment = computeSpecAlignment(scanResult) || (analysis?.overall_score ?? 0);
-  const codeQuality = computeCodeQuality(scanResult) || (audit?.overall_score ?? 0);
-  const standards = computeStandards(scanResult, analysis);
-  const overallScore = Math.round(specAlignment * 0.4 + codeQuality * 0.35 + standards * 0.25);
+  // All three sub-scores come from real data sources; null means "no data yet"
+  const specAlignment = computeSpecAlignment(scanResult);
+  const codeQuality = computeCodeQuality(scanResult);
+  const standards = computeStandards(audit);
+  const overallScore = weightedOverall(specAlignment, codeQuality, standards);
 
-  const hasScanData = !!scanResult?.gap_analysis;
+  const hasScanData = !!scanResult?.gap_analysis || !!scanResult?.functional_inventory?.length;
+  const hasAudit = standards !== null;
   const lastScanAt = progressSummary?.last_scan_at;
 
   return (
@@ -206,19 +194,21 @@ export function DevelopmentHealthSection({
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
           <div className="text-3xl font-bold tabular-nums">
-            {overallScore}%
+            {overallScore === null ? "N/A" : `${overallScore}%`}
           </div>
           <div className="flex-1">
             <div className="h-2 rounded-full bg-secondary overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  overallScore >= 80
-                    ? "bg-status-healthy"
-                    : overallScore >= 50
-                      ? "bg-status-warning"
-                      : "bg-status-critical"
+                  overallScore === null
+                    ? "bg-muted"
+                    : overallScore >= 80
+                      ? "bg-status-healthy"
+                      : overallScore >= 50
+                        ? "bg-status-warning"
+                        : "bg-status-critical"
                 }`}
-                style={{ width: `${overallScore}%` }}
+                style={{ width: `${overallScore ?? 0}%` }}
               />
             </div>
             <div className="flex items-center justify-between mt-1">
@@ -232,11 +222,19 @@ export function DevelopmentHealthSection({
           </div>
         </div>
 
-        {!hasScanData && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+        {(!hasScanData || !hasAudit) && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              Run a <strong>Code Progress Scan</strong> from the overview to get accurate health scores based on your actual codebase.
+              {!hasScanData && !hasAudit && (
+                <>Run a <strong>Code Progress Scan</strong> and an <strong>Audit</strong> to populate health scores.</>
+              )}
+              {hasScanData && !hasAudit && (
+                <>Run an <strong>Audit</strong> to see the Standards score (real LLM code review of style, security, performance, architecture).</>
+              )}
+              {!hasScanData && hasAudit && (
+                <>Run a <strong>Code Progress Scan</strong> to populate Spec Alignment and Code Quality.</>
+              )}
             </p>
           </div>
         )}
@@ -246,19 +244,19 @@ export function DevelopmentHealthSection({
             title="Spec Alignment"
             icon={FileCheck}
             score={specAlignment}
-            label={hasScanData ? "tasks verified" : "from analysis"}
+            label={specAlignment === null ? "not scanned" : "tasks verified"}
           />
           <HealthCard
             title="Standards"
             icon={Shield}
             score={standards}
-            label="compliance"
+            label={standards === null ? "run audit" : "style (audit)"}
           />
           <HealthCard
             title="Code Quality"
             icon={Code2}
             score={codeQuality}
-            label={hasScanData ? "evidence quality" : "audit score"}
+            label={codeQuality === null ? "not scanned" : "evidence quality"}
           />
         </div>
       </CardContent>

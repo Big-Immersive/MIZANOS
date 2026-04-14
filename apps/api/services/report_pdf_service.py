@@ -361,15 +361,43 @@ class ReportPDFService:
 
 
 def _sanitize_text(text: str) -> str:
-    """Replace unicode characters that fpdf2 Helvetica can't render."""
+    """Replace unicode characters that fpdf2's latin-1 Helvetica can't render.
+
+    The final `.encode("latin-1", "replace")` pass is a safety net that turns
+    any remaining non-latin-1 character (emoji, uncommon symbols, etc.) into
+    '?' instead of raising FPDFUnicodeEncodingException mid-render.
+    """
+    if not text:
+        return text
     replacements = {
-        "\u2014": "-", "\u2013": "-", "\u2018": "'", "\u2019": "'",
-        "\u201c": '"', "\u201d": '"', "\u2022": "*", "\u2026": "...",
-        "\u00a0": " ",
+        # Dashes
+        "\u2014": "-", "\u2013": "-", "\u2212": "-",
+        # Quotes
+        "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'",
+        "\u201c": '"', "\u201d": '"', "\u201e": '"', "\u201f": '"',
+        "\u00ab": '"', "\u00bb": '"', "\u2039": "'", "\u203a": "'",
+        # Bullets and ellipsis
+        "\u2022": "*", "\u25cf": "*", "\u25cb": "o", "\u2023": ">",
+        "\u2026": "...",
+        # Spaces
+        "\u00a0": " ", "\u2009": " ", "\u200a": " ", "\u200b": "",
+        "\u202f": " ", "\u2060": "",
+        # Arrows
+        "\u2190": "<-", "\u2192": "->", "\u2191": "^", "\u2193": "v",
+        "\u2194": "<->", "\u21d0": "<=", "\u21d2": "=>", "\u21d4": "<=>",
+        # Math / misc symbols
+        "\u00d7": "x", "\u00f7": "/", "\u00b1": "+/-", "\u221e": "inf",
+        "\u2260": "!=", "\u2264": "<=", "\u2265": ">=", "\u2248": "~",
+        "\u2713": "v", "\u2714": "v", "\u2717": "x", "\u2718": "x",
+        # Currency beyond latin-1
+        "\u20ac": "EUR", "\u20a3": "FF", "\u20a4": "L.", "\u20a6": "N",
+        "\u20a9": "W", "\u20aa": "NIS", "\u20ac": "EUR", "\u20b1": "P",
+        "\u20b9": "Rs", "\u20bd": "RUB",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
-    return text
+    # Safety net — replace anything else that's not latin-1 with '?'
+    return text.encode("latin-1", "replace").decode("latin-1")
 
 
 def _shorten(url: str) -> str:

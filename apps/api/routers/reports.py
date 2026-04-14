@@ -63,6 +63,21 @@ async def get_project_report(
     return report
 
 
+@router.get("/projects/global/pdf")
+async def generate_global_projects_pdf(
+    user: CurrentUser,
+    db: DbSession,
+):
+    """Generate a global multi-project deep-dive PDF (all non-archived projects)."""
+    svc = ProjectReportPDFService(db)
+    buf, filename = await svc.generate_global()
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @router.get("/projects/{product_id}/pdf")
 async def generate_project_pdf(
     product_id: UUID,

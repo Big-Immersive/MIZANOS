@@ -30,12 +30,12 @@ def add_overview_and_members(pdf: FPDF, product: Any, members: list[dict]) -> No
     left_x = pdf.l_margin
     right_x = pdf.l_margin + col_w + 6
 
-    # --- Description spans above the two columns (left-side width) ---
+    # --- Description spans the full content width above the two columns ---
     pdf.set_xy(left_x, start_y)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(*DARK)
     if product.description:
-        pdf.multi_cell(col_w, 5, _sanitize_text(product.description), new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(content_w, 5, _sanitize_text(product.description), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(1)
     fields_start_y = pdf.get_y()
 
@@ -145,10 +145,15 @@ def _render_audit_col(pdf: FPDF, x: float, w: float, audit) -> None:
 def _render_health_col(pdf: FPDF, x: float, w: float, dev_health: dict) -> None:
     _col_title(pdf, x, w, "Development Health")
     pdf.set_x(x)
-    overall = int(dev_health.get("overall", 0))
+    overall = dev_health.get("overall")
+    if overall is None:
+        overall_text, overall_color = "N/A", GREY
+    else:
+        overall_text = f"{int(overall)}%"
+        overall_color = _score_color(int(overall))
     pdf.set_font("Helvetica", "B", 10)
-    pdf.set_text_color(*_score_color(overall))
-    pdf.cell(w, 6, f"Overall: {overall}%")
+    pdf.set_text_color(*overall_color)
+    pdf.cell(w, 6, f"Overall: {overall_text}")
     pdf.ln(6)
     if dev_health.get("last_scan_at"):
         pdf.set_x(x)
@@ -157,13 +162,18 @@ def _render_health_col(pdf: FPDF, x: float, w: float, dev_health: dict) -> None:
         pdf.cell(w, 4, f"Last scan: {dev_health['last_scan_at']}")
         pdf.ln(5)
     for label, key in (("Spec Alignment", "spec_alignment"), ("Standards", "standards"), ("Code Quality", "code_quality")):
-        val = int(dev_health.get(key, 0))
+        raw = dev_health.get(key)
+        if raw is None:
+            text, val_color = "N/A", GREY
+        else:
+            val = int(raw)
+            text, val_color = f"{val}%", _score_color(val)
         pdf.set_x(x)
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(*GREY)
         pdf.cell(w * 0.65, 5, f"  {label}")
-        pdf.set_text_color(*_score_color(val))
-        pdf.cell(w * 0.35, 5, f"{val}%")
+        pdf.set_text_color(*val_color)
+        pdf.cell(w * 0.35, 5, text)
         pdf.ln(5)
 
 
