@@ -113,22 +113,33 @@ class ProjectReportPDFService:
         else:
             add_milestones(pdf, milestone_summary)
         add_project_links(pdf, links)
-        add_ai_insights(pdf, ai_analysis)
-        add_metrics_columns(
-            pdf,
-            float(feature_metrics.get("completion_pct") or 0),
-            github_metrics,
-            audit,
-            dev_health,
-        )
         if mode == "solo":
+            # Solo report keeps its original layout: AI Insights, then metrics,
+            # then tasks, then bugs at the bottom.
+            add_ai_insights(pdf, ai_analysis)
+            add_metrics_columns(
+                pdf,
+                float(feature_metrics.get("completion_pct") or 0),
+                github_metrics,
+                audit,
+                dev_health,
+            )
             task_counts = self._counts_by_status(tasks)
             add_status_summary(pdf, "Tasks", task_counts, len(tasks))
             tasks_grouped = self._group_tasks_by_milestone(milestones, tasks)
             add_tasks_by_milestone(pdf, tasks_grouped)
-            # Solo report: full bug section at the end (counts + detail list), as before.
             add_status_summary(pdf, "Bugs", bug_counts, len(bugs))
             add_item_list(pdf, "Bugs", [self._item(b) for b in bugs])
+        else:
+            # Global report: metrics first, AI insights at the very bottom.
+            add_metrics_columns(
+                pdf,
+                float(feature_metrics.get("completion_pct") or 0),
+                github_metrics,
+                audit,
+                dev_health,
+            )
+            add_ai_insights(pdf, ai_analysis)
 
     # ------------------------------------------------------------------
     # PDF helpers
