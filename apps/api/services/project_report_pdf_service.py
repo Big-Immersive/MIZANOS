@@ -96,7 +96,11 @@ class ProjectReportPDFService:
 
         feature_metrics = report_data.get("feature_metrics", {})
         github_metrics = report_data.get("github_metrics")
-        bug_counts = self._pad_bug_counts(self._counts_by_status(bugs))
+        raw_bug_counts = self._counts_by_status(bugs)
+        # Global report shows the full canonical bug workflow breakdown (zeros
+        # included) so every project's bugs block has the same shape; solo
+        # report keeps only the statuses that actually have bugs.
+        bug_counts = self._pad_bug_counts(raw_bug_counts) if mode == "global" else raw_bug_counts
         milestone_summary = self._build_milestone_summary(milestones, tasks)
 
         add_title(pdf, product.name)

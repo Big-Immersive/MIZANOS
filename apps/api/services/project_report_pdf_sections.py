@@ -156,10 +156,10 @@ def add_status_summary(pdf: FPDF, label: str, counts: dict[str, int], total: int
         pdf.ln(2)
         return
     pdf.set_font("Helvetica", "", 9)
-    for status, count in sorted(counts.items()):
+    for status, count in counts.items():
         pdf.set_text_color(*GREY)
         pdf.cell(45, 6, f"  {status.replace('_', ' ').title()}:")
-        pdf.set_text_color(*DARK)
+        pdf.set_text_color(*_status_color(status))
         pdf.cell(0, 6, str(count), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
 
@@ -192,13 +192,6 @@ def add_global_cover(pdf: FPDF, products: list) -> None:
         pdf.set_text_color(*DARK)
         pdf.cell(0, 6, str(count), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
-
-    _heading(pdf, "Projects in this report")
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(*NAVY)
-    for p in products:
-        stage = p.stage or "-"
-        pdf.cell(0, 5, f"  - {_sanitize_text(p.name)} ({stage})", new_x="LMARGIN", new_y="NEXT")
 
 
 __all__ = [

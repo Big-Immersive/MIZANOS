@@ -9,51 +9,57 @@ from apps.api.services.report_pdf_service import _sanitize_text
 
 
 def compute_dev_health(scan_result, audit, analysis) -> dict:
-    """Mirror the frontend DevelopmentHealthSection score calculation."""
+    """Compute Development Health from real scan + audit data.
+
+    - Spec Alignment: % of spec tasks verified by the latest code scan
+      (scan_result.gap_analysis.progress_pct or verified/total_tasks).
+    - Code Quality: weighted blend of avg task evidence confidence (60%)
+      and fraction of tasks with any artifact found (40%), from
+      scan_result.functional_inventory.
+    - Standards: latest audit's `style` category score. No fake heuristic.
+    - Overall: weighted average of whichever of the three have data.
+
+    If a component has no data it is reported as None; callers render
+    "Not scanned" or "Run audit" instead of a misleading 0%.
+    """
     ga = (scan_result.gap_analysis if scan_result and scan_result.gap_analysis else None) or {}
     inventory = (scan_result.functional_inventory if scan_result and scan_result.functional_inventory else None) or []
-    has_scan = bool(ga)
+    has_scan = bool(ga) or bool(inventory)
 
-    spec = 0
+    # Spec alignment — requires a scan with gap analysis
+    spec: int | None = None
     if isinstance(ga, dict):
         if isinstance(ga.get("progress_pct"), (int, float)):
             spec = round(ga["progress_pct"])
         elif ga.get("total_tasks") and isinstance(ga.get("verified"), (int, float)):
             spec = round((ga["verified"] / ga["total_tasks"]) * 100)
-    if spec == 0 and analysis and getattr(analysis, "overall_score", None):
-        spec = round(analysis.overall_score)
 
-    quality = 0
+    # Code quality — requires inventory from the scan
+    quality: int | None = None
     if isinstance(inventory, list) and inventory:
         total = len(inventory)
         avg_conf = sum(float(e.get("confidence", 0) or 0) for e in inventory if isinstance(e, dict)) / total
         with_artifacts = sum(1 for e in inventory if isinstance(e, dict) and e.get("artifacts_found"))
         quality = round(avg_conf * 60 + (with_artifacts / total) * 40)
-    if quality == 0 and audit and getattr(audit, "overall_score", None):
-        quality = round(audit.overall_score)
 
-    tech_stack = (analysis.tech_stack if analysis and isinstance(analysis.tech_stack, dict) else {}) or {}
-    score = 0
-    checks = 5
-    if tech_stack.get("description"):
-        score += 1
-    try:
-        if int(tech_stack.get("contributors", 0) or 0) > 1:
-            score += 1
-    except (TypeError, ValueError):
-        pass
-    file_count = (scan_result.file_count if scan_result and scan_result.file_count else 0) or 0
-    if file_count > 10:
-        score += 1
-    if isinstance(ga, dict) and ga.get("total_tasks"):
-        no_ev_ratio = float(ga.get("no_evidence", 0) or 0) / float(ga["total_tasks"])
-        if no_ev_ratio < 0.3:
-            score += 1
-        if (ga.get("verified") or 0) > 0:
-            score += 1
-    standards = round((score / checks) * 100)
+    # Standards — latest audit's style category (real LLM code review score)
+    standards: int | None = None
+    has_audit = False
+    if audit and isinstance(getattr(audit, "categories", None), dict):
+        style_score = audit.categories.get("style")
+        if isinstance(style_score, (int, float)):
+            standards = round(float(style_score))
+            has_audit = True
 
-    overall = round(spec * 0.4 + quality * 0.35 + standards * 0.25)
+    # Overall — weighted average across whichever components have data
+    weights = {"spec_alignment": (spec, 0.4), "code_quality": (quality, 0.35), "standards": (standards, 0.25)}
+    present = [(v, w) for v, w in weights.values() if v is not None]
+    if present:
+        total_weight = sum(w for _, w in present)
+        overall: int | None = round(sum(v * w for v, w in present) / total_weight)
+    else:
+        overall = None
+
     last_scan_at = None
     if scan_result and getattr(scan_result, "created_at", None):
         last_scan_at = scan_result.created_at.strftime("%d %b %Y")
@@ -62,38 +68,46 @@ def compute_dev_health(scan_result, audit, analysis) -> dict:
         "code_quality": quality,
         "standards": standards,
         "overall": overall,
-        "spec_label": "tasks verified" if has_scan else "from analysis",
-        "quality_label": "evidence quality" if has_scan else "audit score",
+        "spec_label": "tasks verified" if has_scan else "not scanned",
+        "quality_label": "evidence quality" if has_scan else "not scanned",
+        "standards_label": "style (audit)" if has_audit else "run audit",
         "last_scan_at": last_scan_at,
     }
+
+
+def _fmt_score(value) -> tuple[str, tuple[int, int, int]]:
+    if value is None:
+        return "N/A", GREY
+    v = int(value)
+    color = GREEN if v >= 80 else AMBER if v >= 50 else RED
+    return f"{v}%", color
 
 
 def add_development_health(pdf: FPDF, scores: dict) -> None:
     _maybe_break(pdf, 40)
     _heading(pdf, "Development Health")
-    overall = int(scores.get("overall", 0))
-    color = GREEN if overall >= 80 else AMBER if overall >= 50 else RED
+    overall_text, overall_color = _fmt_score(scores.get("overall"))
     pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(*color)
-    pdf.cell(0, 7, f"Overall Health Score: {overall}%", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*overall_color)
+    pdf.cell(0, 7, f"Overall Health Score: {overall_text}", new_x="LMARGIN", new_y="NEXT")
     if scores.get("last_scan_at"):
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*GREY)
         pdf.cell(0, 5, f"Last scan: {scores['last_scan_at']}", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
     rows = [
-        ("Spec Alignment", int(scores.get("spec_alignment", 0)), scores.get("spec_label", "tasks verified")),
-        ("Standards", int(scores.get("standards", 0)), "compliance"),
-        ("Code Quality", int(scores.get("code_quality", 0)), scores.get("quality_label", "evidence quality")),
+        ("Spec Alignment", scores.get("spec_alignment"), scores.get("spec_label", "tasks verified")),
+        ("Standards", scores.get("standards"), scores.get("standards_label", "style (audit)")),
+        ("Code Quality", scores.get("code_quality"), scores.get("quality_label", "evidence quality")),
     ]
     for label, value, suffix in rows:
-        row_color = GREEN if value >= 80 else AMBER if value >= 50 else RED
+        text, row_color = _fmt_score(value)
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_text_color(*GREY)
         pdf.cell(45, 6, f"  {label}:")
         pdf.set_font("Helvetica", "B", 11)
         pdf.set_text_color(*row_color)
-        pdf.cell(20, 6, f"{value}%")
+        pdf.cell(20, 6, text)
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*GREY)
         pdf.cell(0, 6, suffix, new_x="LMARGIN", new_y="NEXT")
