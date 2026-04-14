@@ -48,6 +48,8 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
   const [milestonePriority, setMilestonePriority] = useState("medium");
   const [milestoneStatus, setMilestoneStatus] = useState("backlog");
   const [milestoneAssignees, setMilestoneAssignees] = useState<string[]>([]);
+  const [milestoneDueDate, setMilestoneDueDate] = useState("");
+  const [milestoneCreatedDate, setMilestoneCreatedDate] = useState("");
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
   const [collapsedMilestones, setCollapsedMilestones] = useState<Set<string>>(new Set());
   const [deleteMilestoneId, setDeleteMilestoneId] = useState<string | null>(null);
@@ -134,6 +136,8 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
   const resetMilestoneForm = () => {
     setMilestoneTitle(""); setMilestoneDesc(""); setMilestonePillar("development");
     setMilestonePriority("medium"); setMilestoneStatus("backlog"); setMilestoneAssignees([]);
+    setMilestoneDueDate("");
+    setMilestoneCreatedDate("");
     setEditingMilestoneId(null); setAddMilestoneOpen(false);
   };
 
@@ -147,6 +151,8 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
       status: milestoneStatus,
       assignee_ids: milestoneAssignees.length > 0 ? milestoneAssignees : undefined,
       assignee_id: milestoneAssignees[0] || null,
+      due_date: milestoneDueDate ? new Date(milestoneDueDate).toISOString() : null,
+      ...(milestoneCreatedDate ? { created_at: new Date(milestoneCreatedDate).toISOString() } : {}),
     };
     if (editingMilestoneId) {
       updateMilestone.mutate({ id: editingMilestoneId, ...data }, { onSuccess: resetMilestoneForm });
@@ -163,6 +169,8 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
     setMilestonePriority(m.priority ?? "medium");
     setMilestoneStatus(m.status ?? "backlog");
     setMilestoneAssignees(m.assignee_ids ?? (m.assignee_id ? [m.assignee_id] : []));
+    setMilestoneDueDate(m.due_date ? m.due_date.slice(0, 10) : "");
+    setMilestoneCreatedDate(m.created_at ? m.created_at.slice(0, 10) : "");
     setAddMilestoneOpen(true);
   };
 
@@ -454,10 +462,27 @@ function TasksTab({ productId, openTaskId }: TasksTabProps) {
                 </Select>
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Created Date</label>
-              <input type="date" defaultValue={new Date().toISOString().split("T")[0]} disabled className="w-full h-9 px-3 text-sm rounded-md border bg-background mt-1 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground mt-0.5">Defaults to today</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Due Date</label>
+                <input
+                  type="date"
+                  value={milestoneDueDate}
+                  onChange={(e) => setMilestoneDueDate(e.target.value)}
+                  className="w-full h-9 px-3 text-sm rounded-md border bg-background mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-0.5">Optional</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Created Date</label>
+                <input
+                  type="date"
+                  value={milestoneCreatedDate}
+                  onChange={(e) => setMilestoneCreatedDate(e.target.value)}
+                  className="w-full h-9 px-3 text-sm rounded-md border bg-background mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-0.5">Defaults to today if empty</p>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={resetMilestoneForm}>Cancel</Button>

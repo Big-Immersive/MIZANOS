@@ -14,6 +14,8 @@ class MilestoneCreate(BaseModel):
     pillar: str = "development"
     assignee_id: UUID | None = None
     assignee_ids: list[str] | None = None
+    due_date: datetime | None = None
+    created_at: datetime | None = None
 
 
 class MilestoneUpdate(BaseModel):
@@ -25,6 +27,8 @@ class MilestoneUpdate(BaseModel):
     assignee_id: UUID | None = None
     assignee_ids: list[str] | None = None
     sort_order: int | None = None
+    due_date: datetime | None = None
+    created_at: datetime | None = None
 
 
 class MilestoneResponse(BaseModel):
@@ -39,6 +43,7 @@ class MilestoneResponse(BaseModel):
     assignee_ids: list[str] | None = None
     sort_order: int
     is_default: bool
+    due_date: datetime | None = None
     task_count: int = 0
     created_at: datetime
     updated_at: datetime

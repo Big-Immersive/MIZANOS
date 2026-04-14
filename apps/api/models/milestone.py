@@ -1,9 +1,10 @@
 """Milestone model — grouping layer for tasks within a project."""
 
 import uuid
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,3 +28,4 @@ class Milestone(Base, UUIDMixin, TimestampMixin):
     assignee_ids: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True, default=list)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
