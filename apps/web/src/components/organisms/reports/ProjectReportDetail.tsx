@@ -6,8 +6,15 @@ import { Calendar, GitBranch, User, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Badge } from "@/components/atoms/display/Badge";
 import { useProjectReport } from "@/hooks/queries/useReports";
+import { useProductDetail } from "@/hooks/queries/useProductDetail";
 import { TaskStatusChart } from "@/components/molecules/reports/TaskStatusChart";
 import { AIAnalysisCard } from "@/components/molecules/reports/AIAnalysisCard";
+import { ProjectMembersCard } from "@/components/molecules/reports/ProjectMembersCard";
+import { ProjectStageProgressCard } from "@/components/molecules/reports/ProjectStageProgressCard";
+import { ProjectTimelineHealthCard } from "@/components/molecules/reports/ProjectTimelineHealthCard";
+import { ProjectAuditCard } from "@/components/molecules/reports/ProjectAuditCard";
+import { ProjectBugsCard } from "@/components/molecules/reports/ProjectBugsCard";
+import { ProjectTasksListCard } from "@/components/molecules/reports/ProjectTasksListCard";
 
 interface Props {
   productId: string;
@@ -15,6 +22,8 @@ interface Props {
 
 export function ProjectReportDetail({ productId }: Props) {
   const { data, isLoading } = useProjectReport(productId);
+  const { data: productDetail } = useProductDetail(productId);
+  const product = productDetail?.product;
 
   if (isLoading) {
     return (
@@ -115,8 +124,42 @@ export function ProjectReportDetail({ productId }: Props) {
         </div>
       </div>
 
-      {/* AI Analysis */}
-      <div className="animate-fade-in" style={{ animationDelay: "150ms" }}>
+      {/* Timeline + Stage */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="animate-fade-in" style={{ animationDelay: "150ms" }}>
+          <ProjectTimelineHealthCard
+            startDate={product?.start_date ?? null}
+            endDate={product?.end_date ?? null}
+            completionPct={data.task_metrics.completion_pct ?? 0}
+          />
+        </div>
+        <div className="animate-fade-in" style={{ animationDelay: "200ms" }}>
+          <ProjectStageProgressCard stage={product?.stage ?? data.stage ?? null} />
+        </div>
+      </div>
+
+      {/* Members + Audit */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="animate-fade-in" style={{ animationDelay: "250ms" }}>
+          <ProjectMembersCard productId={productId} />
+        </div>
+        <div className="animate-fade-in" style={{ animationDelay: "300ms" }}>
+          <ProjectAuditCard productId={productId} />
+        </div>
+      </div>
+
+      {/* Tasks + Bugs detail */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="animate-fade-in" style={{ animationDelay: "350ms" }}>
+          <ProjectTasksListCard productId={productId} />
+        </div>
+        <div className="animate-fade-in" style={{ animationDelay: "400ms" }}>
+          <ProjectBugsCard productId={productId} />
+        </div>
+      </div>
+
+      {/* AI Analysis (Development Health) */}
+      <div className="animate-fade-in" style={{ animationDelay: "450ms" }}>
         <AIAnalysisCard productId={productId} analysis={data.ai_analysis} />
       </div>
     </div>
