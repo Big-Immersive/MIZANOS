@@ -17,6 +17,9 @@ import { BUG_STATUS_DISPLAY } from "@/lib/constants";
 import type { KanbanTask, TaskPriority, BugStatus } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/atoms/inputs/BaseSelect";
 import { Bug, Filter, Plus, User } from "lucide-react";
+import { taskAttachmentsRepository } from "@/lib/api/repositories";
+import { toast } from "sonner";
+import type { BugFormValues } from "@/components/organisms/kanban/AddBugDialog";
 
 interface BugsTabProps { productId: string }
 type FilterStatus = BugStatus | "all";
@@ -56,6 +59,26 @@ function BugsTab({ productId }: BugsTabProps) {
         label: `${m.profile?.full_name ?? m.profile?.email ?? "Unnamed"}${m.role ? ` — ${m.role}` : ""}`,
       })),
   [members]);
+
+  const handleCreateBug = useCallback(
+    async (data: BugFormValues, files: File[]) => {
+      try {
+        const created = await createBug.mutateAsync(data);
+        if (files.length > 0) {
+          const results = await Promise.allSettled(
+            files.map((file) => taskAttachmentsRepository.upload(created.id, file)),
+          );
+          const failed = results.filter((r) => r.status === "rejected").length;
+          if (failed > 0) toast.error(`${failed} attachment${failed > 1 ? "s" : ""} failed to upload`);
+          else toast.success(`${files.length} attachment${files.length > 1 ? "s" : ""} uploaded`);
+        }
+        setAddDialogOpen(false);
+      } catch {
+        // createBug mutation already surfaces its own error toast
+      }
+    },
+    [createBug],
+  );
 
   const filteredBugs = useMemo(() => {
     if (!bugs) return [];
@@ -109,7 +132,7 @@ function BugsTab({ productId }: BugsTabProps) {
             onOpenChange={setAddDialogOpen}
             isLoading={createBug.isPending}
             assigneeOptions={assigneeOptions}
-            onSubmit={(data) => { createBug.mutate(data, { onSuccess: () => setAddDialogOpen(false) }); }}
+            onSubmit={handleCreateBug}
           />
         </CardContent>
       </Card>
@@ -200,7 +223,7 @@ function BugsTab({ productId }: BugsTabProps) {
         onOpenChange={setAddDialogOpen}
         isLoading={createBug.isPending}
         assigneeOptions={assigneeOptions}
-        onSubmit={(data) => { createBug.mutate(data, { onSuccess: () => setAddDialogOpen(false) }); }}
+        onSubmit={handleCreateBug}
       />
     </div>
   );
