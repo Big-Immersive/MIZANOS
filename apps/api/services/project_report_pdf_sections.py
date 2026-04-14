@@ -135,8 +135,12 @@ def add_milestones_with_status_breakdown(pdf: FPDF, milestones: list[dict]) -> N
         pdf.cell(0, 5, f"{pct}% complete", new_x="LMARGIN", new_y="NEXT")
         breakdown = m.get("status_breakdown") or {}
         if breakdown:
-            pdf.set_x(pdf.l_margin + 4)
+            pdf.set_x(pdf.l_margin)
             pdf.set_font("Helvetica", "B", 9)
+            indent = "  "
+            indent_w = pdf.get_string_width(indent)
+            pdf.set_text_color(*GREY)
+            pdf.cell(indent_w, 5, indent)
             content_w = pdf.w - pdf.l_margin - pdf.r_margin
             for status, count in sorted(breakdown.items()):
                 if not count:
@@ -146,7 +150,7 @@ def add_milestones_with_status_breakdown(pdf: FPDF, milestones: list[dict]) -> N
                 chunk_w = pdf.get_string_width(chunk) + 6
                 if pdf.get_x() + chunk_w > pdf.l_margin + content_w:
                     pdf.ln(5)
-                    pdf.set_x(pdf.l_margin + 4)
+                    pdf.set_x(pdf.l_margin + indent_w)
                 pdf.set_text_color(*_status_color(status))
                 pdf.cell(chunk_w, 5, chunk)
             pdf.ln(6)
