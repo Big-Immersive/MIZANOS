@@ -150,6 +150,34 @@ def add_milestones_with_status_breakdown(pdf: FPDF, milestones: list[dict]) -> N
     pdf.ln(2)
 
 
+def add_bug_status_compact(pdf: FPDF, counts: dict[str, int], total: int) -> None:
+    """Inline one-line bug breakdown: "Reported: X  Triaging: Y  In Progress: Z ..."
+    color-coded per status. Used in the global report to keep each project page compact.
+    """
+    _maybe_break(pdf, 14)
+    _heading(pdf, f"Bugs ({total} total)")
+    if total == 0:
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(*GREY)
+        pdf.cell(0, 6, "No bugs reported.", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        return
+    pdf.set_x(pdf.l_margin)
+    pdf.set_font("Helvetica", "B", 9)
+    content_w = pdf.w - pdf.l_margin - pdf.r_margin
+    for status, count in counts.items():
+        label = status.replace("_", " ").title()
+        chunk = f"{label}: {count}"
+        chunk_w = pdf.get_string_width(chunk) + 6
+        if pdf.get_x() + chunk_w > pdf.l_margin + content_w:
+            pdf.ln(5)
+            pdf.set_x(pdf.l_margin)
+        pdf.set_text_color(*_status_color(status))
+        pdf.cell(chunk_w, 5, chunk)
+    pdf.ln(6)
+    pdf.ln(2)
+
+
 def add_status_summary(pdf: FPDF, label: str, counts: dict[str, int], total: int) -> None:
     _maybe_break(pdf, 30)
     _heading(pdf, f"{label} ({total} total)")
@@ -200,7 +228,8 @@ def add_global_cover(pdf: FPDF, products: list) -> None:
 
 __all__ = [
     "add_title", "add_milestones", "add_milestones_with_status_breakdown",
-    "add_project_links", "add_status_summary", "add_global_cover",
+    "add_project_links", "add_status_summary", "add_bug_status_compact",
+    "add_global_cover",
     "AMBER", "DARK", "GREEN", "GREY", "NAVY", "RED",
     "_heading", "_maybe_break", "_status_color",
 ]

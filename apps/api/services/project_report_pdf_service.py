@@ -24,6 +24,7 @@ from apps.api.services.project_report_pdf_layout import (
     add_overview_and_members,
 )
 from apps.api.services.project_report_pdf_sections import (
+    add_bug_status_compact,
     add_global_cover,
     add_milestones,
     add_milestones_with_status_breakdown,
@@ -107,8 +108,8 @@ class ProjectReportPDFService:
         add_overview_and_members(pdf, product, members)
         if mode == "global":
             add_milestones_with_status_breakdown(pdf, milestone_summary)
-            # Global report: bugs counts immediately after milestones, no detail list.
-            add_status_summary(pdf, "Bugs", bug_counts, len(bugs))
+            # Global report: one-line color-coded bug status breakdown, no detail list.
+            add_bug_status_compact(pdf, bug_counts, len(bugs))
         else:
             add_milestones(pdf, milestone_summary)
         add_project_links(pdf, links)
