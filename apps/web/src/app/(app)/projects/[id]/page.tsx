@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { Loader2, Pencil, Eye, Settings, Archive } from "lucide-react";
+import { Loader2, Pencil, Eye, Settings, Archive, FileBarChart2 } from "lucide-react";
 
 import { EditableTitle } from "@/components/atoms/inputs/EditableTitle";
 import { ProductTabs } from "@/components/organisms/product/ProductTabs";
@@ -32,6 +32,8 @@ import { Button } from "@/components/molecules/buttons/Button";
 import { useProductDetail } from "@/hooks/queries/useProductDetail";
 import { useUpdateProduct } from "@/hooks/mutations/useProductMutations";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
+import { reportsRepository } from "@/lib/api/repositories";
+import { toast } from "sonner";
 
 interface ProductDetailPageProps {
   params: Promise<{ id: string }>;
@@ -49,6 +51,28 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [docUploadOpen, setDocUploadOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [linkGitHubOpen, setLinkGitHubOpen] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  const handleDownloadReport = async () => {
+    if (downloadingReport) return;
+    setDownloadingReport(true);
+    try {
+      const blob = await reportsRepository.generateProjectPDF(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(product?.product?.name ?? "project").replace(/\s+/g, "_")}_report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Report downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate report");
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   const tabParam = searchParams.get("tab");
   const taskParam = searchParams.get("task");
@@ -130,9 +154,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         ) : (
           <h1 className="text-2xl font-semibold">{productData?.name ?? "Project"}</h1>
         )}
-        <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
-          <Settings className="h-4 w-4 mr-1" /> Settings
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadReport} loading={downloadingReport}>
+            <FileBarChart2 className="h-4 w-4 mr-1" /> Report
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+            <Settings className="h-4 w-4 mr-1" /> Settings
+          </Button>
+        </div>
       </div>
       {isArchived && (
         <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 mb-4">

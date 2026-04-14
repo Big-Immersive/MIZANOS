@@ -63,6 +63,14 @@ export class ReportsRepository {
     return response.data;
   }
 
+  async generateProjectPDF(productId: string): Promise<Blob> {
+    const response = await this.client.get(
+      `${this.basePath}/projects/${productId}/pdf`,
+      { responseType: "blob", timeout: 180_000 },
+    );
+    return response.data;
+  }
+
   async generatePDF(
     productIds: string[], reportType: string = "general",
     taskStatuses?: string[], includeBugs?: boolean,

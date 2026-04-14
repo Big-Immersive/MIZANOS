@@ -35,7 +35,7 @@ async def create_milestone(
     user: CurrentUser = None,
     service: MilestoneService = Depends(get_service),
 ):
-    m = await service.create_milestone(product_id, body.model_dump())
+    m = await service.create_milestone(product_id, body.model_dump(exclude_unset=True))
     return {**{c.key: getattr(m, c.key) for c in m.__table__.columns}, "task_count": 0}
 
 

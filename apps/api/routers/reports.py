@@ -12,6 +12,7 @@ from apps.api.schemas.reports import (
     ProjectReportDetailResponse,
     ReportsSummaryResponse,
 )
+from apps.api.services.project_report_pdf_service import ProjectReportPDFService
 from apps.api.services.report_ai_service import ReportAIService
 from apps.api.services.report_document_service import ReportDocumentService
 from apps.api.services.report_pdf_service import ReportPDFService
@@ -60,6 +61,22 @@ async def get_project_report(
     if cached:
         report["ai_analysis"] = cached
     return report
+
+
+@router.get("/projects/{product_id}/pdf")
+async def generate_project_pdf(
+    product_id: UUID,
+    user: CurrentUser,
+    db: DbSession,
+):
+    """Generate a single-project deep-dive PDF report."""
+    svc = ProjectReportPDFService(db)
+    buf, filename = await svc.generate(product_id)
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.get("/projects/{product_id}/recent-commits")
