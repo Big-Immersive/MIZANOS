@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type AxiosInstance } from "axios";
 import { ApiError, type ApiErrorResponse } from "./errors";
 
-const API_PROXY_BASE = "/api";
+const API_PROXY_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 const AUTH_TOKEN_KEY = "access_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 
