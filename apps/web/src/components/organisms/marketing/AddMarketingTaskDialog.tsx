@@ -125,7 +125,7 @@ export function AddMarketingTaskDialog({
 
           <div className="space-y-2">
             <BaseLabel htmlFor="mkt-due">Due Date</BaseLabel>
-            <BaseInput id="mkt-due" type="date" min={new Date().toISOString().split("T")[0]} {...register("due_date")} />
+            <BaseInput id="mkt-due" type="date" {...register("due_date")} />
           </div>
 
           <DialogFooter className="pt-2">

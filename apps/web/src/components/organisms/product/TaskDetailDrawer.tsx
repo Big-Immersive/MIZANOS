@@ -280,7 +280,7 @@ export function TaskDetailDrawer({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <BaseLabel htmlFor="drawer-due">Due Date</BaseLabel>
-                    <BaseInput id="drawer-due" type="date" min={new Date().toISOString().split("T")[0]} {...register("due_date")} disabled={isAIEngineerOnly} />
+                    <BaseInput id="drawer-due" type="date" {...register("due_date")} disabled={isAIEngineerOnly} />
                   </div>
                   <div className="space-y-1">
                     <BaseLabel>Created Date</BaseLabel>
