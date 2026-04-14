@@ -96,18 +96,17 @@ class ProjectReportPDFService:
 
         feature_metrics = report_data.get("feature_metrics", {})
         github_metrics = report_data.get("github_metrics")
-        bug_counts = self._counts_by_status(bugs)
+        bug_counts = self._pad_bug_counts(self._counts_by_status(bugs))
         milestone_summary = self._build_milestone_summary(milestones, tasks)
 
         add_title(pdf, product.name)
         add_overview_and_members(pdf, product, members)
         if mode == "global":
             add_milestones_with_status_breakdown(pdf, milestone_summary)
+            # Global report: bugs counts immediately after milestones, no detail list.
+            add_status_summary(pdf, "Bugs", bug_counts, len(bugs))
         else:
             add_milestones(pdf, milestone_summary)
-        add_status_summary(pdf, "Bugs", bug_counts, len(bugs))
-        if mode == "solo":
-            add_item_list(pdf, "Bugs", [self._item(b) for b in bugs])
         add_project_links(pdf, links)
         add_ai_insights(pdf, ai_analysis)
         add_metrics_columns(
@@ -122,6 +121,9 @@ class ProjectReportPDFService:
             add_status_summary(pdf, "Tasks", task_counts, len(tasks))
             tasks_grouped = self._group_tasks_by_milestone(milestones, tasks)
             add_tasks_by_milestone(pdf, tasks_grouped)
+            # Solo report: full bug section at the end (counts + detail list), as before.
+            add_status_summary(pdf, "Bugs", bug_counts, len(bugs))
+            add_item_list(pdf, "Bugs", [self._item(b) for b in bugs])
 
     # ------------------------------------------------------------------
     # PDF helpers
@@ -269,6 +271,18 @@ class ProjectReportPDFService:
             key = it.status or "unknown"
             counts[key] = counts.get(key, 0) + 1
         return counts
+
+    _BUG_STATUSES = ("reported", "triaging", "in_progress", "fixed", "verified", "reopened", "live")
+
+    @classmethod
+    def _pad_bug_counts(cls, counts: dict[str, int]) -> dict[str, int]:
+        """Zero-fill all canonical bug statuses so the report always shows
+        the full breakdown (Reported / In Progress / Fixed / ...) instead of
+        only the statuses that happen to have non-zero counts."""
+        padded = {s: 0 for s in cls._BUG_STATUSES}
+        for k, v in counts.items():
+            padded[k] = v
+        return padded
 
     @staticmethod
     def _item(task: Task) -> dict:
