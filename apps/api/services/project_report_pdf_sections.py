@@ -127,12 +127,17 @@ def add_milestones_with_status_breakdown(pdf: FPDF, milestones: list[dict]) -> N
         pdf.cell(0, 6, _sanitize_text(m.get("title", "Untitled"))[:80], new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*GREY)
-        due_label = m.get("due_date") or "No due date"
-        pdf.cell(70, 5, f"  Due: {due_label}")
-        pdf.cell(40, 5, f"Tasks: {m.get('done', 0)}/{m.get('total', 0)}")
+        due_text = f"  Due: {m.get('due_date') or 'No due date'}"
+        tasks_text = f"Tasks: {m.get('done', 0)}/{m.get('total', 0)}"
+        pct_text = f"{pct}% complete"
+        gap = pdf.get_string_width("   ")  # three spaces between chunks
+        pdf.cell(pdf.get_string_width(due_text), 5, due_text)
+        pdf.cell(gap, 5, "")
+        pdf.cell(pdf.get_string_width(tasks_text), 5, tasks_text)
+        pdf.cell(gap, 5, "")
         pdf.set_text_color(*pct_color)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(0, 5, f"{pct}% complete", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 5, pct_text, new_x="LMARGIN", new_y="NEXT")
         breakdown = m.get("status_breakdown") or {}
         if breakdown:
             pdf.set_x(pdf.l_margin)
