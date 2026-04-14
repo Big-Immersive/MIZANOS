@@ -89,10 +89,15 @@ export function useDashboardMetrics() {
         ([stage, count]) => ({ stage, count }),
       );
 
-      // Overdue tasks
-      const now = new Date();
+      // Overdue tasks — compare by whole local days so a task due today is NOT overdue
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const dueDayStart = (iso: string): number => {
+        const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+        return new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
+      };
       const overdueTasks = allTasks
-        .filter((t) => t.due_date && new Date(t.due_date) < now && t.status !== "done" && t.status !== "live" && t.status !== "cancelled")
+        .filter((t) => t.due_date && dueDayStart(t.due_date) < todayStart.getTime() && t.status !== "done" && t.status !== "live" && t.status !== "cancelled")
         .slice(0, 20)
         .map((t) => ({
           id: t.id,
@@ -104,15 +109,15 @@ export function useDashboardMetrics() {
           priority: t.priority ?? "medium",
         }));
 
-      // Tasks due within 3 days (not overdue yet)
-      const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      // Tasks due within 3 days (today through +3, not overdue)
+      const threeDaysOut = todayStart.getTime() + 3 * 24 * 60 * 60 * 1000;
       const overdueIds = new Set(overdueTasks.map((t) => t.id));
       const dueSoonTasks = allTasks
         .filter((t) =>
           t.due_date &&
           !overdueIds.has(t.id) &&
-          new Date(t.due_date) >= now &&
-          new Date(t.due_date) <= threeDaysFromNow &&
+          dueDayStart(t.due_date) >= todayStart.getTime() &&
+          dueDayStart(t.due_date) <= threeDaysOut &&
           t.status !== "done" && t.status !== "live" && t.status !== "cancelled"
         )
         .slice(0, 10)

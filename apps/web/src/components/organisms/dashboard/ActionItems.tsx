@@ -19,6 +19,20 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { useDashboardMetrics, type DashboardMetrics } from "@/hooks/queries/useDashboardMetrics";
 
+function formatDueLabel(dueDate: string): string {
+  const [y, m, d] = dueDate.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const due = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Due today";
+  if (diffDays === 1) return "Due tomorrow";
+  if (diffDays === -1) return "Overdue by 1 day";
+  if (diffDays > 1) return `Due in ${diffDays} days`;
+  return `Overdue by ${Math.abs(diffDays)} days`;
+}
+
 interface ActionItem {
   id: string;
   taskId?: string;
@@ -72,7 +86,7 @@ function buildActionItems(metrics: DashboardMetrics | undefined): ActionItem[] {
       taskId: t.id,
       type: "overdue",
       title: t.title,
-      subtitle: `Due ${formatDistanceToNow(new Date(t.due_date), { addSuffix: true })}`,
+      subtitle: formatDueLabel(t.due_date),
       productId: t.product_id,
       productName: t.product_name,
       severity: "critical",
@@ -85,7 +99,7 @@ function buildActionItems(metrics: DashboardMetrics | undefined): ActionItem[] {
       taskId: t.id,
       type: "due_soon",
       title: t.title,
-      subtitle: `Due ${formatDistanceToNow(new Date(t.due_date), { addSuffix: true })}`,
+      subtitle: formatDueLabel(t.due_date),
       productId: t.product_id,
       productName: t.product_name,
       severity: "warning",

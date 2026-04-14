@@ -165,7 +165,6 @@ export function AddBugDialog({ open, onOpenChange, onSubmit, isLoading, assignee
             <BaseInput
               id="bug-due-date"
               type="date"
-              min={new Date().toISOString().split("T")[0]}
               {...register("due_date")}
             />
           </div>

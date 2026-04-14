@@ -248,7 +248,6 @@ export function AddTaskDialog({
               <BaseInput
                 id="task-due-date"
                 type="date"
-                min={new Date().toISOString().split("T")[0]}
                 {...register("due_date")}
               />
             </div>
