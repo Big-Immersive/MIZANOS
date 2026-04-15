@@ -100,25 +100,25 @@ const CATEGORY_INFO = [
     key: "security" as const,
     name: "Security",
     what: "Secrets in git history, dependency CVEs, and code-level vulnerabilities (SQL injection, hardcoded passwords, unsafe eval) — from gitleaks, osv-scanner, and bandit.",
-    improve: "Fix the flagged secrets and upgrade the vulnerable packages listed below. Address high-severity SAST findings first.",
+    improve: "Start with any critical findings above — rotate leaked secrets immediately, then upgrade vulnerable packages and address high-severity SAST issues.",
   },
   {
     key: "dependencies" as const,
     name: "Dependency Health",
     what: "How many packages are outdated, vulnerable, unpinned, or have conflicting licenses — from pip / npm / osv-scanner.",
-    improve: "Run pip install --upgrade / npm update. Pin wildcard versions. Replace any GPL/AGPL libraries.",
+    improve: "Upgrade the flagged packages (npm update / pip install --upgrade), pin wildcard versions in your manifest, and replace libraries with conflicting licenses.",
   },
   {
     key: "code_quality" as const,
     name: "Code Quality",
     what: "Cyclomatic complexity, duplication %, linter errors, test/source ratio — from lizard, jscpd, and ruff.",
-    improve: "Refactor functions with complexity over 15. Extract duplicated blocks. Fix linter warnings. Raise the test/source ratio.",
+    improve: "Refactor the complexity hotspots listed above (target CCN under 15), extract duplicated blocks into shared helpers, clear remaining linter warnings, and add tests where the ratio is thin.",
   },
   {
     key: "hygiene" as const,
     name: "Project Hygiene",
     what: "README, LICENSE, CI config, tests directory, Dockerfile, .gitignore, recent commits, multiple contributors.",
-    improve: "Fill in the missing pieces from the checklist below. Most are one-file fixes.",
+    improve: "Add the missing files shown above — each failed check is usually a one-file fix. Start with README and LICENSE, then wire up CI.",
   },
 ];
 
