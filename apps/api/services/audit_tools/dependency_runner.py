@@ -1,4 +1,11 @@
-"""Dependency Health runner — pip + npm outdated counts + osv-scanner reuse."""
+"""Dependency Health runner — npm outdated + osv-scanner (repo manifests).
+
+Python dependency health is covered via osv-scanner (reads pyproject.toml /
+requirements.txt / poetry.lock etc directly). We deliberately do NOT run
+`pip list --outdated`, because that inspects the worker container's Python
+env — not the target repo's declared dependencies — and would produce
+misleading "outdated" counts.
+"""
 
 import asyncio
 import json
@@ -13,42 +20,6 @@ from apps.api.services.audit_tools.security_runner import _run, _run_osv_scanner
 logger = logging.getLogger(__name__)
 
 _WILDCARD_RE = re.compile(r'["\'][~^*]|"\*"|\blatest\b', re.IGNORECASE)
-
-
-async def _pip_outdated(repo: Path) -> tuple[int, list[dict]]:
-    """Return (outdated_major_count, findings). Only counts if the repo
-    declares a pyproject.toml or requirements.txt."""
-    if not shutil.which("pip"):
-        return 0, []
-    has_py = (repo / "pyproject.toml").exists() or any(repo.glob("requirements*.txt"))
-    if not has_py:
-        return 0, []
-    rc, stdout, _ = await _run(["pip", "list", "--outdated", "--format=json"])
-    if rc != 0 or not stdout:
-        return 0, []
-    try:
-        items = json.loads(stdout.decode(errors="ignore") or "[]")
-    except json.JSONDecodeError:
-        return 0, []
-    outdated_major = 0
-    findings: list[dict] = []
-    for item in items:
-        try:
-            cur = (item.get("version") or "0").split(".")[0]
-            latest = (item.get("latest_version") or "0").split(".")[0]
-            if cur and latest and int(cur) < int(latest):
-                outdated_major += 1
-                findings.append(
-                    finding(
-                        "medium",
-                        f"{item.get('name')}: {item.get('version')} → {item.get('latest_version')} (major)",
-                        tool="pip",
-                        category="dependencies",
-                    )
-                )
-        except (ValueError, AttributeError):
-            continue
-    return outdated_major, findings
 
 
 async def _npm_outdated(repo: Path) -> tuple[int, list[dict]]:
@@ -114,30 +85,23 @@ async def run_dependencies(repo_path: str) -> dict:
         return {"score": 0, "findings": [], "raw_metrics": {"error": "repo path missing"}}
 
     results = await asyncio.gather(
-        _pip_outdated(repo),
         _npm_outdated(repo),
         _run_osv_scanner(repo),
         return_exceptions=True,
     )
-
-    pip_res, npm_res, osv_res = (
-        r if not isinstance(r, Exception) else (0, []) if i < 2 else {"available": False, "critical": 0, "high": 0, "medium": 0, "low": 0, "findings": []}
-        for i, r in enumerate(results)
-    )
-    for r, name in zip(results, ["pip", "npm", "osv-scanner"]):
+    npm_res, osv_res = results
+    for r, name in zip(results, ["npm", "osv-scanner"]):
         if isinstance(r, Exception):
             logger.warning("dependency %s failed: %s", name, r)
 
-    pip_outdated_major, pip_findings = (pip_res if isinstance(pip_res, tuple) else (0, []))
-    npm_outdated_major, npm_findings = (npm_res if isinstance(npm_res, tuple) else (0, []))
+    npm_outdated_major, npm_findings = npm_res if isinstance(npm_res, tuple) else (0, [])
     osv = osv_res if isinstance(osv_res, dict) else {"available": False, "critical": 0, "high": 0, "medium": 0, "low": 0, "findings": []}
 
-    outdated_major = pip_outdated_major + npm_outdated_major
+    outdated_major = npm_outdated_major
     vulnerable = osv.get("critical", 0) + osv.get("high", 0) + osv.get("medium", 0) + osv.get("low", 0)
     unpinned = _count_unpinned(repo)
 
     findings: list[dict] = []
-    findings.extend(pip_findings)
     findings.extend(npm_findings)
     findings.extend(osv.get("findings", []))
     if unpinned > 10:
@@ -150,7 +114,7 @@ async def run_dependencies(repo_path: str) -> dict:
             )
         )
 
-    tools_run = ["pip", "npm"] + (["osv-scanner"] if osv.get("available") else [])
+    tools_run = ["npm"] + (["osv-scanner"] if osv.get("available") else [])
 
     return {
         "score": dependency_score(outdated_major=outdated_major, vulnerable=vulnerable),
