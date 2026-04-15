@@ -12,6 +12,7 @@ interface UseAIChatStreamOptions {
 export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
 
   const streamMessage = useCallback(
     async (
@@ -19,12 +20,17 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
       contextMessages: AIChatMessage[],
       assistantMsgId: string,
     ) => {
+      // Abort any prior in-flight stream before starting a new one.
+      abortRef.current?.abort();
+      try { await readerRef.current?.cancel(); } catch { /* noop */ }
+      readerRef.current = null;
+
+      const controller = new AbortController();
+      abortRef.current = controller;
       setIsStreaming(true);
       let content = "";
 
       try {
-        abortRef.current = new AbortController();
-
         const messages = contextMessages.slice(-20).map((m) => ({
           role: m.role,
           content: m.content,
@@ -33,16 +39,19 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
         const response = await aiRepository.streamChat(
           sessionId,
           messages,
-          abortRef.current.signal,
+          controller.signal,
         );
 
         const reader = response.body!.getReader();
+        readerRef.current = reader;
         const decoder = new TextDecoder();
         let buffer = "";
 
         while (true) {
+          if (controller.signal.aborted) break;
           const { done, value } = await reader.read();
           if (done) break;
+          if (controller.signal.aborted) break;
 
           buffer += decoder.decode(value, { stream: true });
 
@@ -65,7 +74,7 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
               delta = payload;
             }
 
-            if (delta) {
+            if (delta && !controller.signal.aborted) {
               content += delta;
               onChunk(content, assistantMsgId);
             }
@@ -73,10 +82,15 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
+        if (controller.signal.aborted) return;
         onError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setIsStreaming(false);
-        abortRef.current = null;
+        // Only flip streaming off if this controller is still the active one.
+        if (abortRef.current === controller) {
+          setIsStreaming(false);
+          abortRef.current = null;
+          readerRef.current = null;
+        }
       }
     },
     [onChunk, onError],
@@ -84,6 +98,9 @@ export function useAIChatStream({ onChunk, onError }: UseAIChatStreamOptions) {
 
   const cancelStream = useCallback(() => {
     abortRef.current?.abort();
+    try { readerRef.current?.cancel(); } catch { /* noop */ }
+    readerRef.current = null;
+    abortRef.current = null;
     setIsStreaming(false);
   }, []);
 
