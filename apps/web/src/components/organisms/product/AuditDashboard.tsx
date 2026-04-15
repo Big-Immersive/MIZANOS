@@ -11,16 +11,38 @@ import {
 
 interface AuditDashboardProps { audits: Audit[] }
 
-interface AuditCategories { style: number; architecture: number; security: number; performance: number }
+type AuditCategories = Record<string, number>;
 
 function parseCats(c: JsonValue): AuditCategories {
-  if (c && typeof c === "object" && !Array.isArray(c))
-    return { style: (c.style as number) ?? 0, architecture: (c.architecture as number) ?? 0, security: (c.security as number) ?? 0, performance: (c.performance as number) ?? 0 };
-  return { style: 0, architecture: 0, security: 0, performance: 0 };
+  if (c && typeof c === "object" && !Array.isArray(c)) {
+    const out: AuditCategories = {};
+    for (const [k, v] of Object.entries(c)) {
+      if (typeof v === "number") out[k] = v;
+    }
+    return out;
+  }
+  return {};
 }
 
 function parseIssues(i: JsonValue): Array<{ severity: string; message?: string }> {
-  return Array.isArray(i) ? (i as Array<{ severity: string; message?: string }>) : [];
+  if (Array.isArray(i)) return i as Array<{ severity: string; message?: string }>;
+  if (i && typeof i === "object") {
+    const out: Array<{ severity: string; message?: string }> = [];
+    const bucket = i as Record<string, unknown>;
+    for (const sev of ["critical", "warnings", "info"]) {
+      const list = bucket[sev];
+      if (Array.isArray(list)) {
+        const tag = sev === "warnings" ? "warning" : sev;
+        for (const item of list) {
+          if (item && typeof item === "object") {
+            out.push({ severity: tag, ...(item as Record<string, unknown>) } as { severity: string; message?: string });
+          }
+        }
+      }
+    }
+    return out;
+  }
+  return [];
 }
 
 function statusLabel(score: number): { text: string; color: string; icon: typeof CheckCircle2 } {
@@ -32,10 +54,30 @@ function statusLabel(score: number): { text: string; color: string; icon: typeof
 function barColor(s: number) { return s >= 80 ? "bg-green-500" : s >= 60 ? "bg-yellow-500" : "bg-red-500" }
 
 const CATEGORY_INFO = [
-  { key: "style" as const, name: "Code Confidence", what: "How well your code matches the tasks in the spec", improve: "Ensure every task has corresponding code. Run scans after completing tasks." },
-  { key: "architecture" as const, name: "Architecture", what: "How much of your task list is verified in the codebase", improve: "Close gaps between planned tasks and actual implementation." },
-  { key: "security" as const, name: "Delivery Health", what: "Task completion rate minus penalties for overdue work", improve: "Complete overdue tasks or update their due dates. Reduce work-in-progress." },
-  { key: "performance" as const, name: "Performance", what: "Repository health — scan coverage, file structure, artifacts", improve: "Keep repo clean. Remove unused files. Ensure scans complete successfully." },
+  {
+    key: "security" as const,
+    name: "Security",
+    what: "Secrets in git history, dependency CVEs, and code-level vulnerabilities (SQL injection, hardcoded passwords, unsafe eval) — from gitleaks, osv-scanner, and bandit.",
+    improve: "Fix the flagged secrets and upgrade the vulnerable packages listed below. Address high-severity SAST findings first.",
+  },
+  {
+    key: "dependencies" as const,
+    name: "Dependency Health",
+    what: "How many packages are outdated, vulnerable, unpinned, or have conflicting licenses — from pip / npm / osv-scanner.",
+    improve: "Run pip install --upgrade / npm update. Pin wildcard versions. Replace any GPL/AGPL libraries.",
+  },
+  {
+    key: "code_quality" as const,
+    name: "Code Quality",
+    what: "Cyclomatic complexity, duplication %, linter errors, test/source ratio — from lizard, jscpd, and ruff.",
+    improve: "Refactor functions with complexity over 15. Extract duplicated blocks. Fix linter warnings. Raise the test/source ratio.",
+  },
+  {
+    key: "hygiene" as const,
+    name: "Project Hygiene",
+    what: "README, LICENSE, CI config, tests directory, Dockerfile, .gitignore, recent commits, multiple contributors.",
+    improve: "Fill in the missing pieces from the checklist below. Most are one-file fixes.",
+  },
 ];
 
 export function AuditDashboard({ audits }: AuditDashboardProps) {
@@ -53,8 +95,10 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
   const securityCount = issues.filter((i) => i.severity === "critical").length;
   const warningCount = issues.filter((i) => i.severity === "warning").length;
   const debtHours = Math.round(issues.length * 0.5);
-  const duplicationPct = Math.max(0, Math.round(100 - cats.style - 10));
-  const coveragePct = Math.min(100, Math.round(cats.architecture * 1.1));
+  const qualityScore = cats.code_quality ?? 0;
+  const hygieneScore = cats.hygiene ?? 0;
+  const duplicationPct = Math.max(0, Math.round(100 - qualityScore - 10));
+  const coveragePct = Math.min(100, Math.round(hygieneScore * 1.1));
 
   const toggle = (key: string) => setExpandedCard(expandedCard === key ? null : key);
 
@@ -75,7 +119,7 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
                   <span className={`text-sm font-semibold ${overallStatus.color}`}>{overallStatus.text}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Based on code quality, task completion, architecture, and repo health
+                  Based on real security scans, dependency audits, code quality metrics, and project hygiene
                 </p>
               </div>
             </div>
@@ -131,7 +175,7 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
         </CardHeader>
         <CardContent className="space-y-2">
           {CATEGORY_INFO.map((cat) => {
-            const score = cats[cat.key];
+            const score = cats[cat.key] ?? 0;
             const status = statusLabel(score);
             const isExpanded = expandedCard === cat.key;
             return (

@@ -28,12 +28,10 @@ interface AuditHistoryItemProps {
   isDeleting?: boolean;
 }
 
-interface AuditCategories {
-  style: number;
-  architecture: number;
-  security: number;
-  performance: number;
-}
+// Categories is a flexible record because audits can contain either the
+// new keys (security / dependencies / code_quality / hygiene) or the legacy
+// keys (style / architecture / security / performance).
+type AuditCategories = Record<string, number>;
 
 interface AuditIssue {
   severity: string;
@@ -43,45 +41,62 @@ interface AuditIssue {
 }
 
 const CATEGORY_ICONS: Record<string, typeof FileCode> = {
-  style: FileCode,
-  architecture: FolderTree,
   security: Shield,
-  performance: Gauge,
+  dependencies: FolderTree,
+  code_quality: FileCode,
+  hygiene: Gauge,
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  style: "Code Confidence",
-  architecture: "Architecture",
-  security: "Delivery Health",
-  performance: "Performance",
+  security: "Security",
+  dependencies: "Dependency Health",
+  code_quality: "Code Quality",
+  hygiene: "Project Hygiene",
 };
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  style: "Code-task matching confidence from scan",
-  architecture: "Task coverage verified in codebase",
-  security: "Task completion rate minus overdue penalties",
-  performance: "Repo health checks (scan, files, artifacts)",
+  security: "Secrets, CVEs, and SAST findings from gitleaks / osv-scanner / bandit",
+  dependencies: "Outdated / vulnerable / unpinned packages",
+  code_quality: "Complexity, duplication, linter errors, test ratio",
+  hygiene: "README / LICENSE / CI / tests / Dockerfile / commits / contributors",
 };
 
 function parseCategories(categories: JsonValue): AuditCategories {
-  if (
-    categories &&
-    typeof categories === "object" &&
-    !Array.isArray(categories)
-  ) {
-    return {
-      style: (categories.style as number) ?? 0,
-      architecture: (categories.architecture as number) ?? 0,
-      security: (categories.security as number) ?? 0,
-      performance: (categories.performance as number) ?? 0,
-    };
+  if (categories && typeof categories === "object" && !Array.isArray(categories)) {
+    const out: AuditCategories = {};
+    for (const [key, val] of Object.entries(categories)) {
+      if (typeof val === "number") out[key] = val;
+    }
+    return out;
   }
-  return { style: 0, architecture: 0, security: 0, performance: 0 };
+  return {};
 }
 
 function parseIssues(issues: JsonValue): AuditIssue[] {
   if (Array.isArray(issues)) {
     return issues as unknown as AuditIssue[];
+  }
+  // New shape: { critical: [...], warnings: [...], info: [...] }
+  if (issues && typeof issues === "object") {
+    const out: AuditIssue[] = [];
+    const bucket = issues as Record<string, unknown>;
+    for (const severity of ["critical", "warnings", "info"]) {
+      const list = bucket[severity];
+      if (Array.isArray(list)) {
+        const tag =
+          severity === "critical"
+            ? "critical"
+            : severity === "warnings"
+              ? "warning"
+              : "info";
+        for (const item of list) {
+          if (item && typeof item === "object") {
+            out.push({ severity: tag, ...(item as Record<string, unknown>) } as unknown as AuditIssue);
+          }
+        }
+      }
+    }
+    return out;
   }
   return [];
 }
@@ -158,12 +173,7 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
         <CollapsibleContent>
           <div className="p-4 border-t bg-secondary/20 space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(
-                Object.entries(categories) as [
-                  keyof AuditCategories,
-                  number,
-                ][]
-              ).map(([key, value]) => {
+              {Object.entries(categories).map(([key, value]) => {
                 const Icon = CATEGORY_ICONS[key] ?? FileCode;
                 const rounded = Math.round(value * 10) / 10;
                 const color = rounded >= 80 ? "text-status-healthy" : rounded >= 50 ? "text-status-warning" : "text-status-critical";
