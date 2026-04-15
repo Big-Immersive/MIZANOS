@@ -137,34 +137,6 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Score Trend */}
-      {audits.length >= 2 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div>
-              <CardTitle className="text-sm">Score History</CardTitle>
-              <p className="text-[10px] text-muted-foreground mt-0.5">How your audit score has changed over time</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-1 h-20">
-              {[...audits].reverse().map((audit) => {
-                const height = Math.max(4, audit.overall_score);
-                return (
-                  <div key={audit.id} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-[9px] text-muted-foreground">{Math.round(audit.overall_score)}</span>
-                    <div className={`w-full rounded-t ${barColor(audit.overall_score)}`} style={{ height: `${height}%` }} />
-                    <span className="text-[8px] text-muted-foreground">
-                      {new Date(audit.run_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Category Breakdown — clickable with explanations */}
       <Card>
         <CardHeader className="pb-2">
