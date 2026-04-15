@@ -221,7 +221,6 @@ function ProductOverview({ productId }: ProductOverviewProps) {
       {product.repository_url && (
         <DevelopmentHealthSection
           productId={productId}
-          repositoryUrl={product.repository_url}
           specificationId={specification?.id}
         />
       )}

@@ -3,22 +3,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/display/Card";
 import { Button } from "@/components/molecules/buttons/Button";
 import { Skeleton } from "@/components/atoms/display/Skeleton";
-import { useRepositoryAnalysis, useAnalyzeRepository } from "@/hooks/queries/useRepositoryAnalysis";
 import { useLatestAudit } from "@/hooks/queries/useAuditHistory";
-import { useRunAudit } from "@/hooks/mutations/useAuditMutations";
 import { useScanResult, useProgressSummary } from "@/hooks/queries/useScans";
+import { useTriggerHighLevelScan } from "@/hooks/mutations/useScanMutations";
 import {
   Activity,
   Code2,
   FileCheck,
   Shield,
   AlertTriangle,
-  RefreshCw,
+  Play,
+  Loader2,
 } from "lucide-react";
 
 interface DevelopmentHealthSectionProps {
   productId: string;
-  repositoryUrl: string;
   specificationId?: string;
 }
 
@@ -164,16 +163,15 @@ function weightedOverall(spec: number | null, quality: number | null, standards:
 
 export function DevelopmentHealthSection({
   productId,
-  repositoryUrl,
 }: DevelopmentHealthSectionProps) {
-  const { data: analysis, isLoading: analysisLoading } = useRepositoryAnalysis(productId);
   const { data: audit, isLoading: auditLoading } = useLatestAudit(productId);
   const { data: scanResult, isLoading: scanLoading } = useScanResult(productId);
   const { data: progressSummary } = useProgressSummary(productId);
-  const analyzeRepo = useAnalyzeRepository(productId);
-  const runAudit = useRunAudit(productId);
+  const triggerScan = useTriggerHighLevelScan(productId);
+  const scanRunning = !!progressSummary?.active_job_id;
+  const busy = triggerScan.isPending || scanRunning;
 
-  const isLoading = analysisLoading || auditLoading || scanLoading;
+  const isLoading = auditLoading || scanLoading;
 
   if (isLoading) {
     return (
@@ -212,26 +210,20 @@ export function DevelopmentHealthSection({
           <CardTitle className="text-base flex items-center gap-2">
             <Activity className="h-4 w-4" /> Development Health
           </CardTitle>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => analyzeRepo.mutate({ repositoryUrl })}
-              disabled={analyzeRepo.isPending}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${analyzeRepo.isPending ? "animate-spin" : ""}`} />
-              Analyze
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => runAudit.mutate()}
-              disabled={runAudit.isPending}
-            >
-              <Shield className="h-3.5 w-3.5 mr-1" />
-              Audit
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => triggerScan.mutate()}
+            disabled={busy}
+            title={scanRunning ? "A scan is already running for this project" : undefined}
+          >
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5 mr-1" />
+            )}
+            {scanRunning ? "Scan running…" : "Run Scan"}
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -269,15 +261,7 @@ export function DevelopmentHealthSection({
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              {!hasScanData && !hasAudit && (
-                <>Run a <strong>Code Progress Scan</strong> and an <strong>Audit</strong> to populate health scores.</>
-              )}
-              {hasScanData && !hasAudit && (
-                <>Run an <strong>Audit</strong> to see the Standards score (real LLM code review of style, security, performance, architecture).</>
-              )}
-              {!hasScanData && hasAudit && (
-                <>Run a <strong>Code Progress Scan</strong> to populate Spec Alignment and Code Quality.</>
-              )}
+              Click <strong>Run Scan</strong> to populate all three health scores — one pass runs the progress scan and the static-analysis audit together.
             </p>
           </div>
         )}
