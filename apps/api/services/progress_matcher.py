@@ -66,6 +66,7 @@ class ProgressMatcherService:
                 continue
             all_evidence.extend(result.get("task_evidence", []))
 
+        _apply_done_task_trust(all_evidence)
         summary = _compute_summary(all_evidence, len(tasks))
         return {"scan_summary": summary, "task_evidence": all_evidence}
 
@@ -186,11 +187,34 @@ class ProgressMatcherService:
                 "raw_response": raw[:500],
             }
 
-        if "scan_summary" not in result:
-            result["scan_summary"] = _compute_summary(
-                result.get("task_evidence", []), total_tasks,
-            )
+        evidence = result.get("task_evidence", []) or []
+        _apply_done_task_trust(evidence)
+        result["task_evidence"] = evidence
+        # Always recompute summary from the (clamped) evidence list so the
+        # verified/partial/no_evidence counts agree with the per-task view.
+        result["scan_summary"] = _compute_summary(evidence, total_tasks)
         return result
+
+
+_DONE_STATUSES = {"done", "completed", "live"}
+
+
+def _apply_done_task_trust(evidence: list[dict]) -> None:
+    """If the task owner marked it Done AND the scan found at least one
+    artifact backing it up, treat the LLM's borderline match as Verified.
+
+    Prevents the common false-Partial on shipped tasks where the
+    verification criteria is vague and the LLM can't be fully confident
+    even though real code exists. Mutates `evidence` in place.
+    """
+    for e in evidence:
+        if e.get("verified"):
+            continue
+        status = str(e.get("status_in_pm") or "").lower()
+        artifacts = e.get("artifacts_found") or []
+        if status in _DONE_STATUSES and len(artifacts) > 0:
+            e["verified"] = True
+            e["trust_reason"] = "done_with_artifacts"
 
 
 def _compute_summary(evidence: list[dict], total: int) -> dict:

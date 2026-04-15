@@ -32,6 +32,25 @@ def _maybe_break(pdf: FPDF, needed: int = 25) -> None:
         pdf.add_page()
 
 
+def add_project_separator(pdf: FPDF, min_room: int = 90) -> None:
+    """Visual break between two projects in the global report.
+
+    If there isn't at least `min_room` mm of vertical space left, starts a
+    fresh page instead so the next project's title + overview don't get
+    split. Otherwise draws a thin rule with breathing room above and below.
+    """
+    bottom_margin = getattr(pdf, "b_margin", 20) or 20
+    room_left = pdf.h - bottom_margin - pdf.get_y()
+    if room_left < min_room:
+        pdf.add_page()
+        return
+    pdf.ln(8)
+    pdf.set_draw_color(220, 220, 220)
+    y = pdf.get_y()
+    pdf.line(pdf.l_margin, y, pdf.w - pdf.r_margin, y)
+    pdf.ln(8)
+
+
 def add_title(pdf: FPDF, project_name: str) -> None:
     pdf.set_font("Helvetica", "B", 20)
     pdf.set_text_color(*DARK)
@@ -242,7 +261,7 @@ def add_global_cover(pdf: FPDF, products: list) -> None:
 __all__ = [
     "add_title", "add_milestones", "add_milestones_with_status_breakdown",
     "add_project_links", "add_status_summary", "add_bug_status_compact",
-    "add_global_cover",
+    "add_global_cover", "add_project_separator",
     "AMBER", "DARK", "GREEN", "GREY", "NAVY", "RED",
     "_heading", "_maybe_break", "_status_color",
 ]
