@@ -6,7 +6,9 @@ import { Button } from "@/components/molecules/buttons/Button";
 import { useAuditHistory } from "@/hooks/queries/useAuditHistory";
 import { AuditHistoryItem } from "@/components/organisms/product/AuditHistoryItem";
 import { History, Shield, Loader2, Play } from "lucide-react";
-import { useRunAudit, useDeleteAudit } from "@/hooks/mutations/useAuditMutations";
+import { useDeleteAudit } from "@/hooks/mutations/useAuditMutations";
+import { useTriggerHighLevelScan } from "@/hooks/mutations/useScanMutations";
+import { useProgressSummary } from "@/hooks/queries/useScans";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 import type { Audit, JsonValue } from "@/lib/types";
 import { AuditDashboard } from "./AuditDashboard";
@@ -29,11 +31,15 @@ interface AuditHistoryListProps {
 
 function AuditHistoryList({ productId }: AuditHistoryListProps) {
   const { data: rawAudits, isLoading } = useAuditHistory(productId);
-  const runAudit = useRunAudit(productId);
+  const triggerScan = useTriggerHighLevelScan(productId);
+  const { data: progressSummary } = useProgressSummary(productId);
   const deleteAudit = useDeleteAudit(productId);
   const { isEngineer, isAdmin, isProjectManager } = useRoleVisibility();
   const isAIEngineerOnly = isEngineer && !isAdmin && !isProjectManager;
   const canDelete = !isAIEngineerOnly;
+  const scanRunning = !!progressSummary?.active_job_id;
+  const busy = triggerScan.isPending || scanRunning;
+  const runLabel = scanRunning ? "Scan running…" : "Run Scan";
 
   // Drop pre-refactor audits — they were computed from task state and don't
   // represent real code health. Run a fresh scan to generate a real audit.
@@ -54,10 +60,14 @@ function AuditHistoryList({ productId }: AuditHistoryListProps) {
         <CardContent className="py-12 text-center">
           <Shield className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
           <h3 className="text-lg font-medium text-foreground mb-2">No Audit History</h3>
-          <p className="text-sm text-muted-foreground mb-4">Run your first code audit to see real security, dependency, code quality, and project hygiene scores.</p>
-          <Button onClick={() => runAudit.mutate()} disabled={runAudit.isPending}>
-            {runAudit.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-            Run Audit
+          <p className="text-sm text-muted-foreground mb-4">Run a scan to generate the first audit — security, dependency, code quality, and project hygiene scores are produced in one pass.</p>
+          <Button
+            onClick={() => triggerScan.mutate()}
+            disabled={busy}
+            title={scanRunning ? "A scan is already running for this project" : undefined}
+          >
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+            {runLabel}
           </Button>
         </CardContent>
       </Card>
@@ -73,9 +83,15 @@ function AuditHistoryList({ productId }: AuditHistoryListProps) {
           <History className="h-4 w-4" />
           All Audits ({audits.length})
         </h3>
-        <Button variant="outline" size="sm" onClick={() => runAudit.mutate()} disabled={runAudit.isPending}>
-          {runAudit.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
-          Run Audit
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => triggerScan.mutate()}
+          disabled={busy}
+          title={scanRunning ? "A scan is already running for this project" : undefined}
+        >
+          {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
+          {runLabel}
         </Button>
       </div>
 

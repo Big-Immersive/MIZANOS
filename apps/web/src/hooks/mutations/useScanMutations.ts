@@ -16,7 +16,12 @@ export function useTriggerHighLevelScan(productId: string) {
       toast.success("Scan started — tracking progress");
     },
     onError: (error: Error) => {
-      toast.error("Failed to start scan: " + error.message);
+      const msg = error.message || "";
+      if (msg.toLowerCase().includes("already in progress")) {
+        toast.info("A scan is already running for this project. Please wait for it to finish.");
+      } else {
+        toast.error("Failed to start scan: " + msg);
+      }
     },
   });
 }
