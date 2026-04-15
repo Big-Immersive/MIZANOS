@@ -122,7 +122,7 @@ function ScanProgressCard({ productId }: ScanProgressCardProps) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <ScanSearch className="h-4 w-4" /> Code Progress Scan
+            <ScanSearch className="h-4 w-4" /> Code Evidence Scan
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -149,9 +149,14 @@ function ScanProgressCard({ productId }: ScanProgressCardProps) {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ScanSearch className="h-4 w-4" /> Code Progress Scan
-            </CardTitle>
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <ScanSearch className="h-4 w-4" /> Code Evidence Scan
+              </CardTitle>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                How well each done task is backed by real code — separate from task-completion %.
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               {isScanning && (
                 <Button
