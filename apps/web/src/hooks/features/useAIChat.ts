@@ -103,13 +103,15 @@ export function useAIChat(productId: string | null) {
 
   const clearChat = useCallback(async () => {
     if (!session) return;
-    await aiRepository.deleteSession(session.id);
+    cancelStream();
     setMessages([]);
     setError(null);
+    await aiRepository.deleteSession(session.id);
+    sessionIdRef.current = null;
     queryClient.invalidateQueries({
       queryKey: ["ai-chat-session", productId, user?.id],
     });
-  }, [session, productId, user?.id, queryClient]);
+  }, [session, productId, user?.id, queryClient, cancelStream]);
 
   return {
     messages,
