@@ -220,14 +220,23 @@ class ProjectReportPDFService:
         return list(result.scalars().all())
 
     async def _fetch_latest_audit(self, product_id: UUID) -> Audit | None:
+        """Return the newest audit row that has at least one of the new
+        category keys. Legacy task-based audits (dependencies / code_quality
+        / hygiene absent) are skipped so the PDF never surfaces stale
+        category names from the pre-refactor audit system.
+        """
         stmt = (
             select(Audit)
             .where(Audit.product_id == product_id)
             .order_by(Audit.run_at.desc())
-            .limit(1)
+            .limit(10)
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        for row in result.scalars().all():
+            cats = row.categories if isinstance(row.categories, dict) else {}
+            if any(k in cats for k in ("dependencies", "code_quality", "hygiene")):
+                return row
+        return None
 
     async def _fetch_repository_analysis(self, product_id: UUID) -> RepositoryAnalysis | None:
         stmt = (
