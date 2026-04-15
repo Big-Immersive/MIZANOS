@@ -50,7 +50,7 @@ class AuditService(BaseService[Audit]):
         from apps.api.services.scan_service import ScanService
 
         scan_svc = ScanService(self.repo.session)
-        await scan_svc.trigger_high_level_scan(product_id, user_id)
+        await scan_svc.trigger_high_level_scan(product_id, str(user_id))
         return await self._latest_for_product(product_id)
 
     async def delete_audit(self, audit_id: UUID) -> None:
