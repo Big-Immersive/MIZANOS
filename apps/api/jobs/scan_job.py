@@ -5,6 +5,12 @@ from uuid import UUID
 
 from apps.api.jobs.context import JobContext
 from apps.api.services.artifact_extractor import ArtifactExtractor
+from apps.api.services.audit_tools import (
+    check_hygiene,
+    run_code_quality,
+    run_dependencies,
+    run_security,
+)
 from apps.api.services.progress_matcher import ProgressMatcherService
 from apps.api.services.repo_clone_service import RepoCloneService
 from apps.api.services.task_service import TaskService
@@ -53,28 +59,51 @@ async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:
         tmp_dir, commit_sha = await clone_svc.shallow_clone(product_id)
         logger.info("Job %s: clone complete, commit %s", job_id, commit_sha[:8])
 
-        # 30% — Extract artifacts
-        await jctx.update_progress(job_id, 30, "Extracting code artifacts")
+        # 20% — Security audit (gitleaks + osv-scanner + bandit)
+        await jctx.update_progress(job_id, 20, "Scanning for secrets and vulnerabilities")
+        security_result = await run_security(tmp_dir)
+
+        # 30% — Dependency audit
+        await jctx.update_progress(job_id, 30, "Auditing dependencies")
+        dependency_result = await run_dependencies(tmp_dir)
+
+        # 45% — Code quality (lizard + jscpd + ruff)
+        await jctx.update_progress(job_id, 45, "Measuring code quality")
+        code_quality_result = await run_code_quality(tmp_dir)
+
+        # 55% — Project hygiene
+        await jctx.update_progress(job_id, 55, "Checking project hygiene")
+        hygiene_result = await check_hygiene(tmp_dir)
+
+        audit_results = {
+            "security": security_result,
+            "dependencies": dependency_result,
+            "code_quality": code_quality_result,
+            "hygiene": hygiene_result,
+        }
+
+        # 65% — Extract artifacts
+        await jctx.update_progress(job_id, 65, "Extracting code artifacts")
         extractor = ArtifactExtractor()
         artifacts = extractor.extract(tmp_dir)
 
-        # 50% — Fetch tasks
-        await jctx.update_progress(job_id, 50, "Loading project tasks")
+        # 75% — Fetch tasks
+        await jctx.update_progress(job_id, 75, "Loading project tasks")
         task_svc = TaskService(session)
         tasks_result = await task_svc.list_tasks(
             product_id=product_id, page_size=500, task_type="task",
         )
         task_dicts = [_serialize_task(t) for t in tasks_result["data"]]
 
-        # 70% — AI matching
-        await jctx.update_progress(job_id, 70, "Analyzing progress with AI")
+        # 85% — AI matching
+        await jctx.update_progress(job_id, 85, "Analyzing progress with AI")
         matcher = ProgressMatcherService(session)
         result = await matcher.match(task_dicts, artifacts)
 
-        # 85% — Store results
-        await jctx.update_progress(job_id, 85, "Saving scan results")
+        # 92% — Store results
+        await jctx.update_progress(job_id, 92, "Saving audit results")
         await _save_scan_results(
-            session, product_id, commit_sha, artifacts, result,
+            session, product_id, commit_sha, artifacts, result, audit_results,
         )
         await session.commit()
 
@@ -92,10 +121,12 @@ async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:
 
 async def _save_scan_results(
     session, product_id: UUID, commit_sha: str,
-    artifacts: dict, result: dict,
+    artifacts: dict, result: dict, audit_results: dict | None = None,
 ) -> None:
-    """Persist scan results to RepositoryAnalysis, RepoScanHistory, Product."""
-    from apps.api.models.audit import RepositoryAnalysis, RepoScanHistory
+    """Persist scan results to RepositoryAnalysis, RepoScanHistory, Product,
+    and create an Audit row from the audit_tools output.
+    """
+    from apps.api.models.audit import Audit, RepositoryAnalysis, RepoScanHistory
     from apps.api.models.product import Product
 
     product = await session.get(Product, product_id)
@@ -131,6 +162,34 @@ async def _save_scan_results(
         },
     )
     session.add(scan_history)
+
+    # Create Audit row from real tool results (if audit_tools ran)
+    if audit_results:
+        categories = {
+            "security": audit_results["security"]["score"],
+            "dependencies": audit_results["dependencies"]["score"],
+            "code_quality": audit_results["code_quality"]["score"],
+            "hygiene": audit_results["hygiene"]["score"],
+        }
+        overall = round(sum(categories.values()) / len(categories), 1)
+
+        all_findings: list[dict] = []
+        for key in ("security", "dependencies", "code_quality", "hygiene"):
+            all_findings.extend(audit_results[key].get("findings", []))
+
+        issues = {
+            "critical": [f for f in all_findings if f.get("severity") == "critical"],
+            "warnings": [f for f in all_findings if f.get("severity") in ("high", "medium")],
+            "info": [f for f in all_findings if f.get("severity") == "low"],
+        }
+
+        audit = Audit(
+            product_id=product_id,
+            overall_score=overall,
+            categories=categories,
+            issues=issues,
+        )
+        session.add(audit)
 
     # Update Product progress
     summary = result.get("scan_summary", {})

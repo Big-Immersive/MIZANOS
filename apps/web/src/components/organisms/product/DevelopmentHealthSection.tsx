@@ -99,14 +99,16 @@ function computeCodeQuality(scanResult: ScanResult): number | null {
 }
 
 /**
- * Standards = real audit `style` category score (LLM code review).
- * Returns null when no audit has been run — caller shows "N/A" + a CTA.
+ * Standards = real audit Code Quality score from static-analysis tools
+ * (lizard / jscpd / ruff / bandit). Returns null when no audit has been
+ * run — caller shows "N/A" + a CTA to run a scan.
  */
 function computeStandards(audit: AuditLite): number | null {
   if (!audit?.categories || typeof audit.categories !== "object") return null;
-  const style = (audit.categories as Record<string, unknown>).style;
-  if (typeof style !== "number") return null;
-  return Math.round(style);
+  const cats = audit.categories as Record<string, unknown>;
+  const score = cats.code_quality;
+  if (typeof score === "number") return Math.round(score);
+  return null;
 }
 
 function weightedOverall(spec: number | null, quality: number | null, standards: number | null): number | null {

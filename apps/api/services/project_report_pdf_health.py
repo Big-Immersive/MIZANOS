@@ -42,13 +42,15 @@ def compute_dev_health(scan_result, audit, analysis) -> dict:
         with_artifacts = sum(1 for e in inventory if isinstance(e, dict) and e.get("artifacts_found"))
         quality = round(avg_conf * 60 + (with_artifacts / total) * 40)
 
-    # Standards — latest audit's style category (real LLM code review score)
+    # Standards — latest audit's Code Quality score from the real audit
+    # tools (lizard / jscpd / ruff / bandit). Returns None when no audit
+    # has been run yet — callers render "N/A".
     standards: int | None = None
     has_audit = False
     if audit and isinstance(getattr(audit, "categories", None), dict):
-        style_score = audit.categories.get("style")
-        if isinstance(style_score, (int, float)):
-            standards = round(float(style_score))
+        score = audit.categories.get("code_quality")
+        if isinstance(score, (int, float)):
+            standards = round(float(score))
             has_audit = True
 
     # Overall — weighted average across whichever components have data

@@ -1,6 +1,11 @@
-"""Audit service."""
+"""Audit service.
 
-from datetime import datetime, timezone
+Audits are now produced as a side-effect of the Code Progress Scan — see
+`apps/api/jobs/scan_job.py` and `apps/api/services/audit_tools/`. This
+service only handles reads (list/compare) and the legacy "Run Audit"
+button, which now just triggers a scan.
+"""
+
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -37,134 +42,16 @@ class AuditService(BaseService[Audit]):
             "page_size": page_size,
         }
 
-    async def run_audit(self, product_id: UUID, user_id: str) -> Audit:
-        """Run audit using scan data, GitHub analysis, and task metrics."""
-        from apps.api.models.audit import RepositoryAnalysis
-        from apps.api.models.product import Product
-        from apps.api.models.task import Task
+    async def run_audit(self, product_id: UUID, user_id: str) -> Audit | None:
+        """Trigger a Code Progress Scan which will write an Audit row as a
+        side-effect. Returns the most recent audit (may be the previous
+        one until the scan finishes; frontend polls).
+        """
+        from apps.api.services.scan_service import ScanService
 
-        issues: dict[str, list] = {"critical": [], "warnings": []}
-
-        # Fetch latest scan result (with functional_inventory from Code Progress Scan)
-        scan_stmt = (
-            select(RepositoryAnalysis)
-            .where(RepositoryAnalysis.product_id == product_id)
-            .where(RepositoryAnalysis.functional_inventory.is_not(None))
-            .order_by(RepositoryAnalysis.created_at.desc())
-            .limit(1)
-        )
-        scan = (await self.repo.session.execute(scan_stmt)).scalar_one_or_none()
-
-        # Also fetch latest analysis (from Analyze button, has tech_stack)
-        analysis_stmt = (
-            select(RepositoryAnalysis)
-            .where(RepositoryAnalysis.product_id == product_id)
-            .order_by(RepositoryAnalysis.created_at.desc())
-            .limit(1)
-        )
-        analysis = (await self.repo.session.execute(analysis_stmt)).scalar_one_or_none()
-
-        # Fetch tasks for the product
-        task_stmt = select(Task).where(Task.product_id == product_id)
-        tasks = list((await self.repo.session.execute(task_stmt)).scalars().all())
-        total_tasks = len(tasks)
-
-        # Fetch product for repo info
-        product = await self.repo.session.get(Product, product_id)
-
-        # --- Style score: code organization & structure ---
-        style = 0.0
-        if scan:
-            evidence = scan.functional_inventory or []
-            if isinstance(evidence, list) and evidence:
-                confidences = [e.get("confidence", 0) for e in evidence if isinstance(e, dict)]
-                style = round((sum(confidences) / len(confidences)) * 100, 1) if confidences else 0
-        # Use analysis tech_stack for description bonus
-        tech = {}
-        if analysis and isinstance(analysis.tech_stack, dict):
-            tech = analysis.tech_stack
-        elif scan and isinstance(scan.tech_stack, dict):
-            tech = scan.tech_stack
-        if tech.get("description"):
-            style = min(100, style + 10)
-
-        # --- Architecture score: task coverage & component structure ---
-        architecture = 0.0
-        if scan and scan.gap_analysis and isinstance(scan.gap_analysis, dict):
-            ga = scan.gap_analysis
-            total = ga.get("total_tasks", 0)
-            verified = ga.get("verified", 0)
-            partial = ga.get("partial", 0)
-            no_evidence = ga.get("no_evidence", 0)
-            if total > 0:
-                architecture = round(((verified + partial * 0.5) / total) * 100, 1)
-            if no_evidence > 3:
-                issues["warnings"].append({
-                    "title": f"{no_evidence} tasks have no matching code",
-                    "category": "architecture",
-                })
-
-        # --- Security score: based on task completion & overdue ---
-        security = 0.0
-        if total_tasks > 0:
-            done = sum(1 for t in tasks if t.status in ("done", "live"))
-            now = datetime.now(timezone.utc)
-            overdue = 0
-            for t in tasks:
-                if not t.due_date or t.status in ("done", "live"):
-                    continue
-                dd = t.due_date if t.due_date.tzinfo else t.due_date.replace(tzinfo=timezone.utc)
-                if dd < now:
-                    overdue += 1
-            completion_ratio = done / total_tasks
-            security = round(completion_ratio * 100, 1)
-            if overdue > 0:
-                penalty = min(30, overdue * 10)
-                security = max(0, security - penalty)
-                issues["critical"].append({
-                    "title": f"{overdue} overdue task(s) still open",
-                    "category": "security",
-                })
-
-        # --- Performance score: scan freshness & repo health ---
-        performance = 0.0
-        checks_passed = 0
-        total_checks = 5
-        if scan:
-            checks_passed += 1  # Has scan data
-            if scan.file_count and scan.file_count > 10:
-                checks_passed += 1
-            fi = scan.functional_inventory
-            if isinstance(fi, list) and len(fi) > 0:
-                with_artifacts = sum(
-                    1 for e in fi
-                    if isinstance(e, dict) and e.get("artifacts_found")
-                )
-                if with_artifacts > len(fi) * 0.5:
-                    checks_passed += 1
-        if product and product.repository_url:
-            checks_passed += 1
-        if total_tasks > 0 and sum(1 for t in tasks if t.status in ("done", "live")) > 0:
-            checks_passed += 1
-        performance = round((checks_passed / total_checks) * 100, 1)
-
-        categories = {
-            "style": style,
-            "architecture": architecture,
-            "security": security,
-            "performance": performance,
-        }
-
-        overall_score = round(sum(categories.values()) / len(categories), 1)
-
-        audit = Audit(
-            product_id=product_id,
-            created_by=user_id,
-            overall_score=overall_score,
-            categories=categories,
-            issues=issues,
-        )
-        return await self.repo.create(audit)
+        scan_svc = ScanService(self.repo.session)
+        await scan_svc.trigger_high_level_scan(product_id, user_id)
+        return await self._latest_for_product(product_id)
 
     async def delete_audit(self, audit_id: UUID) -> None:
         """Delete a single audit record."""
@@ -204,15 +91,11 @@ class AuditService(BaseService[Audit]):
 
         if previous:
             score_diff = current.overall_score - previous.overall_score
-            all_keys = set(current.categories.keys()) | set(
-                previous.categories.keys()
-            )
+            all_keys = set(current.categories.keys()) | set(previous.categories.keys())
             for key in all_keys:
                 cur_val = current.categories.get(key)
                 prev_val = previous.categories.get(key)
-                if isinstance(cur_val, (int, float)) and isinstance(
-                    prev_val, (int, float)
-                ):
+                if isinstance(cur_val, (int, float)) and isinstance(prev_val, (int, float)):
                     categories_diff[key] = cur_val - prev_val
 
         return {
@@ -223,3 +106,13 @@ class AuditService(BaseService[Audit]):
             "categories_diff": categories_diff,
             "has_comparison": previous is not None,
         }
+
+    async def _latest_for_product(self, product_id: UUID) -> Audit | None:
+        stmt = (
+            select(Audit)
+            .where(Audit.product_id == product_id)
+            .order_by(Audit.run_at.desc())
+            .limit(1)
+        )
+        result = await self.repo.session.execute(stmt)
+        return result.scalar_one_or_none()

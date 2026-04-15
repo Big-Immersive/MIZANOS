@@ -9,9 +9,31 @@ RUN pip install --no-cache-dir .
 FROM python:3.12-slim
 WORKDIR /app
 
-# git needed for repo cloning during scans
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# git + curl + nodejs + npm needed for scans and audit tooling
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git curl ca-certificates gnupg nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+# --- Audit tooling binaries ---
+# gitleaks — secrets in git history
+RUN curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+    | tar -xz -C /usr/local/bin gitleaks && chmod +x /usr/local/bin/gitleaks
+
+# osv-scanner — CVE lookup via OSV.dev (covers npm/pypi/go/rust/maven/etc)
+RUN curl -sSL -o /usr/local/bin/osv-scanner \
+        https://github.com/google/osv-scanner/releases/download/v1.9.2/osv-scanner_linux_amd64 \
+    && chmod +x /usr/local/bin/osv-scanner
+
+# npm-based tools: jscpd (duplication), license-checker
+RUN npm install -g --silent jscpd license-checker
+
+# Python audit tools (installed alongside the app deps)
+RUN pip install --no-cache-dir \
+        bandit[toml]==1.8.0 \
+        radon==6.0.1 \
+        lizard==1.17.13 \
+        pip-licenses==5.0.0 \
+        ruff==0.8.4
 
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
