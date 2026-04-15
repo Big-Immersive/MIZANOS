@@ -27,11 +27,13 @@ function HealthCard({
   icon: Icon,
   score,
   label,
+  why,
 }: {
   title: string;
   icon: typeof Activity;
   score: number | null;
   label: string;
+  why: string;
 }) {
   const color =
     score === null
@@ -69,6 +71,9 @@ function HealthCard({
             style={{ width: `${score ?? 0}%` }}
           />
         </div>
+        <p className="mt-2 text-[10px] text-muted-foreground leading-snug">
+          <span className="font-medium text-foreground">Why: </span>{why}
+        </p>
       </CardContent>
     </Card>
   );
@@ -109,6 +114,42 @@ function computeStandards(audit: AuditLite): number | null {
   const score = cats.code_quality;
   if (typeof score === "number") return Math.round(score);
   return null;
+}
+
+function specWhy(score: number | null, scanResult: ScanResult): string {
+  if (score === null) return "Run a Code Progress Scan to measure how many spec tasks are backed by real code.";
+  const ga = scanResult?.gap_analysis;
+  const verified = ga?.verified;
+  const total = ga?.total_tasks;
+  if (typeof verified === "number" && typeof total === "number" && total > 0) {
+    const missing = total - verified;
+    if (missing === 0) return `All ${total} spec tasks have matching code evidence.`;
+    return `${verified} of ${total} tasks have code evidence — ${missing} still unmatched.`;
+  }
+  if (score >= 95) return "Almost all spec tasks map to real code.";
+  if (score >= 50) return `${100 - score}% of spec tasks have no matching code yet.`;
+  return "Most spec tasks have no code evidence — either the scan is incomplete or the work is still ahead.";
+}
+
+function standardsWhy(score: number | null): string {
+  if (score === null) return "Click Audit to run lizard, ruff, and jscpd against the repo — this card needs a fresh audit.";
+  if (score >= 90) return "Minimal complexity hotspots, linter warnings, or duplication.";
+  if (score >= 70) return "Some complex functions, linter warnings, or duplication — expand the Code Quality row in Audit History for the full list.";
+  if (score >= 50) return "Noticeable complexity, duplication, or linter noise — see Audit History for the hotspots.";
+  return "Heavy complexity / duplication / linter issues. Start with the complexity hotspots in the latest audit.";
+}
+
+function codeQualityWhy(score: number | null, scanResult: ScanResult): string {
+  if (score === null) return "Run a Code Progress Scan so the AI can match tasks to real code artifacts.";
+  const inv = scanResult?.functional_inventory;
+  if (inv?.length) {
+    const total = inv.length;
+    const withArtifacts = inv.filter((e) => e.artifacts_found && e.artifacts_found.length > 0).length;
+    const avgConf = inv.reduce((s, e) => s + (e.confidence ?? 0), 0) / total;
+    const missing = total - withArtifacts;
+    return `${withArtifacts}/${total} tasks have code artifacts; avg evidence confidence ${(avgConf * 100).toFixed(0)}%${missing ? ` — ${missing} tasks still unmatched` : ""}.`;
+  }
+  return "Scan evidence is partial — re-run the scan on a fresh commit.";
 }
 
 function weightedOverall(spec: number | null, quality: number | null, standards: number | null): number | null {
@@ -247,18 +288,21 @@ export function DevelopmentHealthSection({
             icon={FileCheck}
             score={specAlignment}
             label={specAlignment === null ? "not scanned" : "tasks verified"}
+            why={specWhy(specAlignment, scanResult)}
           />
           <HealthCard
             title="Standards"
             icon={Shield}
             score={standards}
             label={standards === null ? "run audit" : "style (audit)"}
+            why={standardsWhy(standards)}
           />
           <HealthCard
             title="Code Quality"
             icon={Code2}
             score={codeQuality}
             label={codeQuality === null ? "not scanned" : "evidence quality"}
+            why={codeQualityWhy(codeQuality, scanResult)}
           />
         </div>
       </CardContent>

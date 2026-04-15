@@ -31,10 +31,29 @@ def security_score(
     return _clamp(100 - penalty)
 
 
-def dependency_score(*, outdated_major: int = 0, vulnerable: int = 0) -> int:
-    """Outdated major versions are soft-flagged, known CVEs hit hard."""
-    penalty = outdated_major * 3 + vulnerable * 10
-    return _clamp(100 - penalty)
+def dependency_score(
+    *,
+    outdated_major: int = 0,
+    vulnerable: int = 0,
+    critical: int = 0,
+    high: int = 0,
+    medium: int = 0,
+    low: int = 0,
+) -> int:
+    """Penalise by CVE severity with a softened curve so mature JS repos
+    with real-but-transitive CVEs don't floor to 0.
+
+    Accepts either a pre-summed `vulnerable` count (back-compat) or
+    severity-split counts. When severity counts are provided, they take
+    precedence and produce a proportional penalty that floors at 30 so
+    the bar is always visible and readable.
+    """
+    if critical or high or medium or low:
+        penalty = critical * 8 + high * 3 + medium * 1 + low * 0.3 + outdated_major * 2
+        return _clamp(100 - penalty, lo=30)
+    # Legacy flat-count path: cap the hit so one noisy osv run doesn't zero the score.
+    penalty = outdated_major * 2 + min(vulnerable * 2, 60)
+    return _clamp(100 - penalty, lo=30)
 
 
 def code_quality_score(
