@@ -77,8 +77,8 @@ async def run_dependencies(repo_path: str) -> dict:
     score = dependency_score(
         critical=critical, high=high, medium=medium, low=low, outdated_major=0,
     )
-    logger.info(
-        "dependency audit: score=%s vulnerable=%s (c=%s h=%s m=%s l=%s) unpinned=%s tools=%s",
+    logger.warning(
+        "AUDIT_DEP score=%s vulnerable=%s c=%s h=%s m=%s l=%s unpinned=%s tools=%s",
         score, vulnerable, critical, high, medium, low, unpinned, tools_run,
     )
 
