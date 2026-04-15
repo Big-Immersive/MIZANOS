@@ -29,6 +29,7 @@ from apps.api.services.project_report_pdf_sections import (
     add_milestones,
     add_milestones_with_status_breakdown,
     add_project_links,
+    add_project_separator,
     add_status_summary,
     add_title,
 )
@@ -64,13 +65,22 @@ class ProjectReportPDFService:
         return buf, f"{safe or 'project'}_report.pdf"
 
     async def generate_global(self) -> tuple[io.BytesIO, str]:
-        """Global multi-project PDF — every non-archived project, condensed."""
+        """Global multi-project PDF — every non-archived project, condensed.
+
+        Projects flow continuously: after one project's section ends the next
+        begins on the same page with a visual separator and breathing room.
+        A new page is only forced when there isn't enough vertical space left
+        for the next project's header + overview (~90mm).
+        """
         products = await self._fetch_all_active_products()
         pdf = self._new_pdf()
         pdf.add_page()
         add_global_cover(pdf, products)
-        for product in products:
-            pdf.add_page()
+        for idx, product in enumerate(products):
+            if idx == 0:
+                pdf.add_page()
+            else:
+                add_project_separator(pdf, min_room=90)
             await self._render_project(pdf, product, mode="global")
         buf = self._finalize(pdf)
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
