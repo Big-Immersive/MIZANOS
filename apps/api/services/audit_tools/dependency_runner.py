@@ -55,7 +55,11 @@ async def run_dependencies(repo_path: str) -> dict:
         logger.warning("osv-scanner failed: %s", exc)
         osv = {"available": False, "critical": 0, "high": 0, "medium": 0, "low": 0, "findings": []}
 
-    vulnerable = osv.get("critical", 0) + osv.get("high", 0) + osv.get("medium", 0) + osv.get("low", 0)
+    critical = osv.get("critical", 0)
+    high = osv.get("high", 0)
+    medium = osv.get("medium", 0)
+    low = osv.get("low", 0)
+    vulnerable = critical + high + medium + low
     unpinned = _count_unpinned(repo)
 
     findings: list[dict] = list(osv.get("findings", []))
@@ -70,13 +74,24 @@ async def run_dependencies(repo_path: str) -> dict:
         )
 
     tools_run = ["osv-scanner"] if osv.get("available") else []
+    score = dependency_score(
+        critical=critical, high=high, medium=medium, low=low, outdated_major=0,
+    )
+    logger.info(
+        "dependency audit: score=%s vulnerable=%s (c=%s h=%s m=%s l=%s) unpinned=%s tools=%s",
+        score, vulnerable, critical, high, medium, low, unpinned, tools_run,
+    )
 
     return {
-        "score": dependency_score(outdated_major=0, vulnerable=vulnerable),
+        "score": score,
         "findings": findings,
         "raw_metrics": {
             "outdated_major": 0,
             "vulnerable": vulnerable,
+            "critical": critical,
+            "high": high,
+            "medium": medium,
+            "low": low,
             "unpinned_specifiers": unpinned,
             "tools_run": tools_run,
         },
