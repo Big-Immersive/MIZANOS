@@ -30,6 +30,69 @@ function statusLabel(score: number): { text: string; color: string; icon: typeof
   return { text: "Critical", color: "text-red-500", icon: XCircle };
 }
 
+type Finding = { severity?: string; title?: string; tool?: string; category?: string; file?: string; line?: number };
+
+function collectFindings(issues: JsonValue): Finding[] {
+  const out: Finding[] = [];
+  if (!issues || typeof issues !== "object" || Array.isArray(issues)) return out;
+  const bucket = issues as Record<string, unknown>;
+  for (const key of ["critical", "warnings", "info"]) {
+    const list = bucket[key];
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        if (item && typeof item === "object") out.push(item as Finding);
+      }
+    }
+  }
+  return out;
+}
+
+function groupByCategory(findings: Finding[], category: string): Finding[] {
+  return findings.filter((f) => (f.category ?? "") === category);
+}
+
+function buildWhy(category: string, score: number, findings: Finding[]): { summary: string; top: Finding[] } {
+  const crit = findings.filter((f) => f.severity === "critical").length;
+  const high = findings.filter((f) => f.severity === "high").length;
+  const medium = findings.filter((f) => f.severity === "medium").length;
+  const low = findings.filter((f) => f.severity === "low").length;
+  const tools = Array.from(new Set(findings.map((f) => f.tool).filter(Boolean))) as string[];
+  const toolText = tools.length ? ` (${tools.join(", ")})` : "";
+
+  if (findings.length === 0) {
+    if (score >= 95) return { summary: "No findings — all checks passed.", top: [] };
+    return { summary: "Score reflects a baseline deduction; no individual findings recorded.", top: [] };
+  }
+
+  const parts: string[] = [];
+  if (crit) parts.push(`${crit} critical`);
+  if (high) parts.push(`${high} high`);
+  if (medium) parts.push(`${medium} medium`);
+  if (low) parts.push(`${low} low`);
+  const breakdown = parts.join(" · ");
+
+  let prefix = "";
+  switch (category) {
+    case "security":
+      prefix = `${findings.length} security finding${findings.length === 1 ? "" : "s"}: `;
+      break;
+    case "dependencies":
+      prefix = `${findings.length} dependency vulnerabilit${findings.length === 1 ? "y" : "ies"}: `;
+      break;
+    case "code_quality":
+      prefix = `${findings.length} code-quality issue${findings.length === 1 ? "" : "s"}: `;
+      break;
+    case "hygiene":
+      prefix = `${findings.length} hygiene check${findings.length === 1 ? "" : "s"} failed: `;
+      break;
+  }
+
+  return {
+    summary: `${prefix}${breakdown}${toolText}.`,
+    top: findings.slice(0, 5),
+  };
+}
+
 function barColor(s: number) { return s >= 80 ? "bg-green-500" : s >= 60 ? "bg-yellow-500" : "bg-red-500" }
 
 const CATEGORY_INFO = [
@@ -66,6 +129,7 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
   const latest = audits[0];
   const previous = audits.length > 1 ? audits[1] : null;
   const cats = parseCats(latest.categories);
+  const allFindings = collectFindings(latest.issues);
   const scoreDiff = previous ? latest.overall_score - previous.overall_score : 0;
   const overallStatus = statusLabel(latest.overall_score);
   const StatusIcon = overallStatus.icon;
@@ -142,12 +206,31 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
                 <div className="h-1.5 rounded-full bg-secondary overflow-hidden mt-1.5">
                   <div className={`h-full rounded-full ${barColor(score)}`} style={{ width: `${score}%` }} />
                 </div>
-                {isExpanded && (
-                  <div className="mt-2 pt-2 border-t space-y-1">
-                    <p className="text-xs text-muted-foreground"><strong>What is this:</strong> {cat.what}</p>
-                    <p className="text-xs text-muted-foreground"><strong>How to improve:</strong> {cat.improve}</p>
-                  </div>
-                )}
+                {isExpanded && (() => {
+                  const catFindings = groupByCategory(allFindings, cat.key);
+                  const why = buildWhy(cat.key, score, catFindings);
+                  return (
+                    <div className="mt-2 pt-2 border-t space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                      <p className="text-xs text-muted-foreground"><strong className="text-foreground">What is this:</strong> {cat.what}</p>
+                      <p className="text-xs text-muted-foreground"><strong className="text-foreground">Why this score:</strong> {why.summary}</p>
+                      {why.top.length > 0 && (
+                        <ul className="text-[11px] text-muted-foreground list-disc pl-4 space-y-0.5">
+                          {why.top.map((f, i) => (
+                            <li key={i}>
+                              <span className="text-foreground">{f.title || "Finding"}</span>
+                              {f.file && <span className="opacity-70"> — {f.file}{f.line ? `:${f.line}` : ""}</span>}
+                              {f.tool && <span className="opacity-50"> [{f.tool}]</span>}
+                            </li>
+                          ))}
+                          {catFindings.length > why.top.length && (
+                            <li className="list-none opacity-70">+ {catFindings.length - why.top.length} more</li>
+                          )}
+                        </ul>
+                      )}
+                      <p className="text-xs text-muted-foreground"><strong className="text-foreground">How to improve:</strong> {cat.improve}</p>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
