@@ -35,9 +35,12 @@ type AuditCategories = Record<string, number>;
 
 interface AuditIssue {
   severity: string;
+  title?: string;
   message?: string;
   file?: string;
+  line?: number;
   rule?: string;
+  tool?: string;
 }
 
 const CATEGORY_ICONS: Record<string, typeof FileCode> = {
@@ -103,11 +106,14 @@ function parseIssues(issues: JsonValue): AuditIssue[] {
 
 function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: AuditHistoryItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showAllIssues, setShowAllIssues] = useState(false);
 
   const categories = parseCategories(audit.categories);
   const issues = parseIssues(audit.issues);
   const criticalCount = issues.filter((i) => i.severity === "critical").length;
   const runDate = new Date(audit.run_at);
+  const ISSUE_PREVIEW = 10;
+  const visibleIssues = showAllIssues ? issues : issues.slice(0, ISSUE_PREVIEW);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -197,8 +203,8 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
                 <p className="text-xs font-medium text-muted-foreground">
                   Issues ({issues.length})
                 </p>
-                <div className="max-h-48 overflow-y-auto space-y-1">
-                  {issues.slice(0, 10).map((issue, idx) => (
+                <div className={`${showAllIssues ? "max-h-96" : "max-h-48"} overflow-y-auto space-y-1`}>
+                  {visibleIssues.map((issue, idx) => (
                     <div
                       key={idx}
                       className="flex items-start gap-2 text-xs p-2 rounded bg-background"
@@ -217,21 +223,31 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
                         {issue.rule && (
                           <span className="font-medium">{issue.rule}: </span>
                         )}
-                        <span className="text-muted-foreground">
-                          {issue.message ?? "No description"}
+                        <span className="text-foreground">
+                          {issue.title ?? issue.message ?? "No description"}
                         </span>
                         {issue.file && (
                           <p className="text-muted-foreground/70 truncate mt-0.5">
-                            {issue.file}
+                            {issue.file}{issue.line ? `:${issue.line}` : ""}
+                            {issue.tool ? ` · ${issue.tool}` : ""}
                           </p>
                         )}
                       </div>
                     </div>
                   ))}
-                  {issues.length > 10 && (
-                    <p className="text-xs text-muted-foreground text-center py-1">
-                      +{issues.length - 10} more issues
-                    </p>
+                  {issues.length > ISSUE_PREVIEW && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllIssues((v) => !v);
+                      }}
+                      className="w-full text-xs text-primary hover:underline text-center py-1.5"
+                    >
+                      {showAllIssues
+                        ? "Show less"
+                        : `+${issues.length - ISSUE_PREVIEW} more issues — show all`}
+                    </button>
                   )}
                 </div>
               </div>

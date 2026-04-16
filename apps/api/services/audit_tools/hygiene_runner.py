@@ -81,6 +81,43 @@ def _has_dockerfile(repo: Path) -> bool:
     return False
 
 
+def _dockerfile_is_applicable(repo: Path) -> bool:
+    """Dockerfile is N/A for projects deployed via a platform that
+    abstracts it away (Vercel/Netlify for Next.js, Expo for React Native).
+    Detect those markers and treat the Dockerfile check as optional.
+    """
+    not_applicable_markers = [
+        repo / "vercel.json",
+        repo / "netlify.toml",
+        repo / "expo.json",
+        repo / "app.json",
+    ]
+    for m in not_applicable_markers:
+        if m.exists():
+            return False
+    # Next.js repos without any infra/Docker directory usually deploy via Vercel
+    has_next = any(
+        (repo / f"next.config.{ext}").exists()
+        for ext in ("js", "mjs", "cjs", "ts")
+    )
+    if has_next:
+        infra_hints = [repo / "infra", repo / "docker", repo / "deploy"]
+        if not any(p.is_dir() for p in infra_hints):
+            return False
+    return True
+
+
+def _contributors_check_is_applicable(repo: Path, commits_30d: int) -> bool:
+    """Solo-dev repos shouldn't be penalised for having one contributor.
+    Skip this check when the project looks like it's still in early
+    solo development (fewer than 30 commits in the last 30 days AND
+    a small git history overall is handled elsewhere).
+    """
+    # For now always applicable — the low weight (5) already makes this
+    # gentle for solo devs. Hook kept for future refinement.
+    return True
+
+
 def _has_nontrivial_gitignore(repo: Path) -> bool:
     path = repo / ".gitignore"
     if not path.exists():
@@ -132,12 +169,14 @@ async def check_hygiene(repo_path: str) -> dict:
         logger.warning("hygiene git stats failed: %s", exc)
         commits_30d, contributors = 0, 0
 
-    checks = {
+    dockerfile_applicable = _dockerfile_is_applicable(repo)
+
+    checks: dict[str, bool | None] = {
         "readme": _has_nontrivial_readme(repo),
         "license": _has_license(repo),
         "ci_config": _has_ci_config(repo),
         "tests_dir": _has_tests_dir(repo),
-        "dockerfile": _has_dockerfile(repo),
+        "dockerfile": _has_dockerfile(repo) if dockerfile_applicable else None,
         "gitignore": _has_nontrivial_gitignore(repo),
         "recent_commits": commits_30d > 0,
         "contributors": contributors > 1,
@@ -155,7 +194,7 @@ async def check_hygiene(repo_path: str) -> dict:
         "contributors": "Only one contributor on record",
     }
     for key, passed in checks.items():
-        if not passed:
+        if passed is False:
             findings.append(
                 finding("low", failure_map[key], tool="hygiene", category="hygiene")
             )
@@ -164,7 +203,8 @@ async def check_hygiene(repo_path: str) -> dict:
         "score": hygiene_score(checks),
         "findings": findings,
         "raw_metrics": {
-            "checks": checks,
+            "checks": {k: (v if v is not None else "n/a") for k, v in checks.items()},
+            "dockerfile_applicable": dockerfile_applicable,
             "commits_last_30_days": commits_30d,
             "contributor_count": contributors,
             "tools_run": ["hygiene"],

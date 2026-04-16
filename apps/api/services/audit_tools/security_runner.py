@@ -167,14 +167,18 @@ async def run_security(repo_path: str) -> dict:
 
     all_findings: list[dict] = []
     all_findings.extend(gitleaks.get("findings", []))
-    all_findings.extend(osv.get("findings", []))
     all_findings.extend(bandit.get("findings", []))
+    # osv-scanner CVEs are intentionally NOT aggregated into the
+    # security score — they already drive Dependency Health. Keeping
+    # them on both scores would double-count the same finding. We still
+    # surface them in the combined findings list for visibility.
+    all_findings.extend(osv.get("findings", []))
 
-    totals = {
-        "critical": (osv.get("critical", 0) + bandit.get("critical", 0)),
-        "high": (osv.get("high", 0) + bandit.get("high", 0)),
-        "medium": (osv.get("medium", 0) + bandit.get("medium", 0)),
-        "low": (osv.get("low", 0) + bandit.get("low", 0)),
+    score_totals = {
+        "critical": bandit.get("critical", 0),
+        "high": bandit.get("high", 0),
+        "medium": bandit.get("medium", 0),
+        "low": bandit.get("low", 0),
         "secrets_found": gitleaks.get("count", 0),
     }
 
@@ -184,8 +188,22 @@ async def run_security(repo_path: str) -> dict:
         if res.get("available")
     ]
 
+    # raw_metrics includes both the score-driving counts and the
+    # osv-scanner counts (for transparency in the audit JSONB) even
+    # though osv no longer drives the score.
+    raw_metrics = {
+        **score_totals,
+        "dep_cves_surfaced": {
+            "critical": osv.get("critical", 0),
+            "high": osv.get("high", 0),
+            "medium": osv.get("medium", 0),
+            "low": osv.get("low", 0),
+        },
+        "tools_run": tools_run,
+    }
+
     return {
-        "score": security_score(**totals),
+        "score": security_score(**score_totals),
         "findings": all_findings,
-        "raw_metrics": {**totals, "tools_run": tools_run},
+        "raw_metrics": raw_metrics,
     }
