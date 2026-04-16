@@ -2,9 +2,9 @@
 
 Cron schedule (TEST mode):
   - nightly_scan_all_products       runs Mon–Fri at 08:30 UTC = 13:30 PKT
-  - nightly_global_report_email     runs Mon–Fri at 09:30 UTC = 14:30 PKT
-    (1 hour after the scan, so every project's scan + AI analysis has
-     time to finish before the PDF is generated)
+  - nightly_global_report_email     runs Mon–Fri at 10:00 UTC = 15:00 PKT
+    (currently bumped to 15:00 PKT for an immediate retry test;
+     normal cadence is 1 hour after the scan)
 
 Production schedule will be:
   - scan        13:00 UTC = 18:00 PKT
@@ -41,8 +41,8 @@ class WorkerSettings:
         cron(
             nightly_global_report_email,
             weekday={0, 1, 2, 3, 4},  # Mon..Fri
-            hour=9,
-            minute=30,
+            hour=10,
+            minute=0,
             run_at_startup=False,
             unique=True,
         ),
