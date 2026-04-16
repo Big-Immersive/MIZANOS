@@ -11,6 +11,39 @@ from apps.api.models.ai import AIChatMessage, AIChatSession
 from apps.api.services.ai_context import gather_project_context
 from apps.api.services.llm_config import get_llm_config, get_system_prompt
 
+# Field names that only appear in our spec-generator schema, never in a
+# legitimate chat reply. If any show up in the first chunk of a response,
+# the model has drifted into spec-generation mode and we abort.
+_SPEC_SCHEMA_MARKERS = (
+    "qaChecklist",
+    "nonFunctionalRequirements",
+    "techStack",
+    "acceptance_criteria",
+    "userStories",
+    "businessRules",
+    "acceptanceCriteria",
+    "functionalSpec",
+    "technicalSpec",
+)
+
+
+def _looks_like_spec_dump(text: str) -> bool:
+    """Detect chat replies that have drifted into spec-JSON output.
+
+    Only triggers once we have enough text to be confident (~40 chars)
+    AND the text both starts with a JSON bracket AND contains one of
+    the schema-specific field names. A stray '{' inside a code snippet
+    or an ad-hoc JSON example won't trigger this — the schema markers
+    are the load-bearing signal.
+    """
+    if len(text) < 40:
+        return False
+    stripped = text.lstrip()
+    if not stripped.startswith(("{", "[")):
+        return False
+    window = stripped[:1500]
+    return any(marker in window for marker in _SPEC_SCHEMA_MARKERS)
+
 
 class AIService:
     """AI chat with streaming responses."""
@@ -248,6 +281,7 @@ class AIService:
                 model=config.model, messages=messages, max_tokens=config.max_tokens, stream=True,
             )
 
+            spec_bailout = False
             async for chunk in stream:
                 if await _is_disconnected():
                     client_disconnected = True
@@ -263,6 +297,33 @@ class AIService:
                 if delta:
                     full_response += delta
                     yield f"data: {json.dumps(delta)}\n\n"
+
+                # Guard against the LLM confusing itself with the spec
+                # generator prompt and dumping JSON into the chat. If the
+                # first ~200 chars look like a spec-schema JSON, abort the
+                # stream and replace with a plain-English fallback so the
+                # user never sees a structured dump.
+                if not spec_bailout and _looks_like_spec_dump(full_response):
+                    spec_bailout = True
+                    logger.warning(
+                        "Aborting chat stream for session %s — detected spec-JSON dump",
+                        session_id,
+                    )
+                    try:
+                        await stream.aclose()
+                    except Exception:
+                        pass
+                    break
+
+            if spec_bailout:
+                # Overwrite whatever partial JSON the client already
+                # rendered with a clean fallback message.
+                full_response = (
+                    "I can only answer in plain English. Could you rephrase "
+                    "your question? (For example: 'What are my pending tasks?' "
+                    "or 'Who is working on the mobile feature?')"
+                )
+                yield f"data: {json.dumps(full_response)}\n\n"
 
         except ValueError as e:
             full_response = str(e)
