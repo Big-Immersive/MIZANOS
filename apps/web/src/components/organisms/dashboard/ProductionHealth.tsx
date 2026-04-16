@@ -112,6 +112,7 @@ export function ProductionHealth({ filterProductIds }: ProductionHealthProps) {
   const { data: products = [], isLoading } = useProducts();
 
   const projects = products.filter((p) => {
+    if (p.archived_at) return false;
     if (!PRODUCTION_STAGES.includes(p.stage || "")) return false;
     if (filterProductIds && !filterProductIds.has(p.id)) return false;
     return true;

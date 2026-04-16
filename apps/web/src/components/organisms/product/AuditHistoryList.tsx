@@ -2,13 +2,10 @@
 
 import { Card, CardContent } from "@/components/atoms/display/Card";
 import { Skeleton } from "@/components/atoms/display/Skeleton";
-import { Button } from "@/components/molecules/buttons/Button";
 import { useAuditHistory } from "@/hooks/queries/useAuditHistory";
 import { AuditHistoryItem } from "@/components/organisms/product/AuditHistoryItem";
-import { History, Shield, Loader2, Play } from "lucide-react";
+import { History, Shield } from "lucide-react";
 import { useDeleteAudit } from "@/hooks/mutations/useAuditMutations";
-import { useTriggerHighLevelScan } from "@/hooks/mutations/useScanMutations";
-import { useProgressSummary } from "@/hooks/queries/useScans";
 import { useRoleVisibility } from "@/hooks/utils/useRoleVisibility";
 import type { Audit, JsonValue } from "@/lib/types";
 import { AuditDashboard } from "./AuditDashboard";
@@ -31,18 +28,14 @@ interface AuditHistoryListProps {
 
 function AuditHistoryList({ productId }: AuditHistoryListProps) {
   const { data: rawAudits, isLoading } = useAuditHistory(productId);
-  const triggerScan = useTriggerHighLevelScan(productId);
-  const { data: progressSummary } = useProgressSummary(productId);
   const deleteAudit = useDeleteAudit(productId);
   const { isEngineer, isAdmin, isProjectManager } = useRoleVisibility();
   const isAIEngineerOnly = isEngineer && !isAdmin && !isProjectManager;
   const canDelete = !isAIEngineerOnly;
-  const scanRunning = !!progressSummary?.active_job_id;
-  const busy = triggerScan.isPending || scanRunning;
-  const runLabel = scanRunning ? "Scan running…" : "Run Scan";
 
   // Drop pre-refactor audits — they were computed from task state and don't
-  // represent real code health. Run a fresh scan to generate a real audit.
+  // represent real code health. Run a Code Progress Scan from the Overview
+  // tab to generate a real audit.
   const audits = (rawAudits ?? []).filter(isCurrentAudit);
 
   if (isLoading) {
@@ -60,15 +53,12 @@ function AuditHistoryList({ productId }: AuditHistoryListProps) {
         <CardContent className="py-12 text-center">
           <Shield className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
           <h3 className="text-lg font-medium text-foreground mb-2">No Audit History</h3>
-          <p className="text-sm text-muted-foreground mb-4">Run a scan to generate the first audit — security, dependency, code quality, and project hygiene scores are produced in one pass.</p>
-          <Button
-            onClick={() => triggerScan.mutate()}
-            disabled={busy}
-            title={scanRunning ? "A scan is already running for this project" : undefined}
-          >
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-            {runLabel}
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            Audits are produced automatically by the Code Progress Scan. Open the project{"'"}s
+            Overview tab and click <strong>Scan Now</strong> to generate the first one —
+            security, dependency, code quality, and project hygiene scores all come out of
+            the same scan pass.
+          </p>
         </CardContent>
       </Card>
     );
@@ -78,21 +68,11 @@ function AuditHistoryList({ productId }: AuditHistoryListProps) {
     <div className="space-y-6">
       <AuditDashboard audits={audits} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
         <h3 className="text-base font-semibold flex items-center gap-2">
           <History className="h-4 w-4" />
           All Audits ({audits.length})
         </h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => triggerScan.mutate()}
-          disabled={busy}
-          title={scanRunning ? "A scan is already running for this project" : undefined}
-        >
-          {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
-          {runLabel}
-        </Button>
       </div>
 
       <div className="space-y-2">
