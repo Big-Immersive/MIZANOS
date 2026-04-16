@@ -1,14 +1,10 @@
 """Arq worker settings — registers job functions and Redis config.
 
-Cron schedule (TEST mode):
-  - nightly_scan_all_products       runs Mon–Fri at 08:30 UTC = 13:30 PKT
-  - nightly_global_report_email     runs Mon–Fri at 10:00 UTC = 15:00 PKT
-    (currently bumped to 15:00 PKT for an immediate retry test;
-     normal cadence is 1 hour after the scan)
-
-Production schedule will be:
-  - scan        13:00 UTC = 18:00 PKT
-  - report      14:00 UTC = 19:00 PKT
+Cron schedule (production):
+  - nightly_scan_all_products       runs Mon–Fri at 15:00 UTC = 20:00 PKT
+  - nightly_global_report_email     runs Mon–Fri at 16:00 UTC = 21:00 PKT
+    (1 hour after the scan so every project's scan + AI analysis has
+     time to finish before the PDF is generated)
 """
 
 from arq.cron import cron
@@ -33,15 +29,15 @@ class WorkerSettings:
         cron(
             nightly_scan_all_products,
             weekday={0, 1, 2, 3, 4},  # Mon..Fri
-            hour=8,
-            minute=30,
+            hour=15,
+            minute=0,
             run_at_startup=False,
             unique=True,
         ),
         cron(
             nightly_global_report_email,
             weekday={0, 1, 2, 3, 4},  # Mon..Fri
-            hour=10,
+            hour=16,
             minute=0,
             run_at_startup=False,
             unique=True,
