@@ -69,6 +69,7 @@ class AIService:
             await self.session.delete(msg)
         await self.session.delete(chat_session)
         await self.session.flush()
+        await self.session.commit()
 
     @staticmethod
     def _build_user_content(
@@ -177,9 +178,24 @@ class AIService:
         return assistant_msg
 
     async def stream_response(
-        self, session_id: UUID, content: str, user_id: str
+        self,
+        session_id: UUID,
+        content: str,
+        user_id: str,
+        request=None,
     ) -> AsyncIterator[str]:
-        """Stream AI response as SSE events."""
+        """Stream AI response as SSE events.
+
+        If `request` is supplied, the loop checks `request.is_disconnected()`
+        between chunks. When the client goes away (Clear chat, tab closed,
+        lost network) we stop pulling from the LLM and do NOT save the
+        partial assistant message — otherwise the next page load would
+        replay a half-finished response as if the bot were talking on
+        its own.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
         session_stmt = select(AIChatSession).where(
             AIChatSession.id == session_id,
             AIChatSession.user_id == user_id,
@@ -194,12 +210,24 @@ class AIService:
         history = await self._load_history(session_id)
         project_context = await gather_project_context(self.session, chat_session.product_id)
 
-        # Now save the current user message
+        # Save the user message and commit immediately so it's durable even
+        # if the client disconnects before the assistant finishes.
         user_msg = AIChatMessage(session_id=session_id, role="user", content=content)
         self.session.add(user_msg)
         await self.session.flush()
+        await self.session.commit()
 
         full_response = ""
+        client_disconnected = False
+
+        async def _is_disconnected() -> bool:
+            if request is None:
+                return False
+            try:
+                return await request.is_disconnected()
+            except Exception:
+                return False
+
         try:
             import openai
 
@@ -208,14 +236,11 @@ class AIService:
             system_prompt += project_context
 
             messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-            # Only include USER messages from history (not assistant responses)
-            # This prevents the model from repeating its previous answers
             for msg in history:
                 if msg.content and msg.content.strip() and msg.role == "user":
                     messages.append({"role": "user", "content": msg.content})
                     messages.append({"role": "assistant", "content": "(answered)"})
 
-            # Add current user message at the end (no placeholder after it)
             messages.append({"role": "user", "content": content})
 
             client = openai.AsyncOpenAI(api_key=config.api_key, base_url=config.base_url)
@@ -224,6 +249,16 @@ class AIService:
             )
 
             async for chunk in stream:
+                if await _is_disconnected():
+                    client_disconnected = True
+                    logger.info(
+                        "Client disconnected mid-stream for session %s — aborting", session_id,
+                    )
+                    try:
+                        await stream.aclose()
+                    except Exception:
+                        pass
+                    break
                 delta = chunk.choices[0].delta.content
                 if delta:
                     full_response += delta
@@ -233,15 +268,20 @@ class AIService:
             full_response = str(e)
             yield f"data: {json.dumps(full_response)}\n\n"
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).exception("LLM streaming error")
+            logger.exception("LLM streaming error")
             full_response = self._format_llm_error(e)
             yield f"data: {json.dumps(full_response)}\n\n"
 
-        assistant_msg = AIChatMessage(
-            session_id=session_id, role="assistant", content=full_response
-        )
-        self.session.add(assistant_msg)
-        await self.session.flush()
+        # Only persist the assistant reply when the stream actually
+        # delivered (client stayed connected AND content is non-empty).
+        # A partial response saved here would resurface on the next
+        # session load as a ghost message.
+        if not client_disconnected and full_response.strip():
+            assistant_msg = AIChatMessage(
+                session_id=session_id, role="assistant", content=full_response,
+            )
+            self.session.add(assistant_msg)
+            await self.session.flush()
+            await self.session.commit()
 
         yield "data: [DONE]\n\n"

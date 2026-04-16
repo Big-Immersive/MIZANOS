@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from apps.api.dependencies import CurrentUser, DbSession
@@ -51,7 +51,20 @@ async def send_message(session_id: UUID, body: SendMessageBody, user: CurrentUse
 
 
 @router.post("/chat", response_class=StreamingResponse)
-async def chat(body: ChatMessageCreate, user: CurrentUser, service: AIService = Depends(get_service)):
-    """Send message and receive SSE streaming response."""
-    stream = service.stream_response(body.session_id, body.content, user.id)
+async def chat(
+    body: ChatMessageCreate,
+    request: Request,
+    user: CurrentUser,
+    service: AIService = Depends(get_service),
+):
+    """Send message and receive SSE streaming response.
+
+    The Request is forwarded to the service so the streaming loop can
+    detect a client disconnect (Clear chat, tab close, lost network)
+    and bail out early without saving a partial assistant message to
+    the DB.
+    """
+    stream = service.stream_response(
+        body.session_id, body.content, user.id, request=request,
+    )
     return StreamingResponse(stream, media_type="text/event-stream")
