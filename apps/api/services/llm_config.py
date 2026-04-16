@@ -166,7 +166,11 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
 
 _CHAT_FORMAT_RULE = (
     "CRITICAL: Reply in plain English only. No JSON. No { } [ ] characters. "
-    "Answer ONLY the user's LAST message. Do NOT repeat or reference previous answers.\n\n"
+    "Answer ONLY the user's LAST message. Do NOT repeat or reference previous answers. "
+    "If your reply starts with '{' or '[' you have misunderstood — stop and restart "
+    "your reply in plain English sentences. You are a chat assistant, NOT a spec "
+    "generator. Never output fields like qaChecklist, nonFunctionalRequirements, "
+    "features, techStack, or acceptance_criteria.\n\n"
 )
 
 
