@@ -219,7 +219,7 @@ export function AuditDashboard({ audits }: AuditDashboardProps) {
                             <li key={i}>
                               <span className="text-foreground">{f.title || "Finding"}</span>
                               {f.file && <span className="opacity-70"> — {f.file}{f.line ? `:${f.line}` : ""}</span>}
-                              {f.tool && <span className="opacity-50"> [{f.tool}]</span>}
+                              {f.tool && f.tool !== cat.key && <span className="opacity-50"> [{f.tool}]</span>}
                             </li>
                           ))}
                           {catFindings.length > why.top.length && (
