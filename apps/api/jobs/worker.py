@@ -1,8 +1,8 @@
 """Arq worker settings — registers job functions and Redis config.
 
 Cron schedule (TEST mode):
-  nightly_scan_all_products currently runs Mon–Fri at 07:30 UTC,
-  which equals 12:30 Asia/Karachi (PKT). Change to hour=13 minute=0
+  nightly_scan_all_products currently runs Mon–Fri at 08:30 UTC,
+  which equals 13:30 Asia/Karachi (PKT). Change to hour=13 minute=0
   (18:00 PKT) when moving to the real schedule.
 """
 
@@ -22,7 +22,7 @@ class WorkerSettings:
         cron(
             nightly_scan_all_products,
             weekday={0, 1, 2, 3, 4},  # Mon..Fri
-            hour=7,
+            hour=8,
             minute=30,
             run_at_startup=False,
             unique=True,
