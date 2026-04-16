@@ -110,6 +110,19 @@ async def high_level_scan_job(ctx: dict, job_id_str: str) -> None:
         # 100% — Done
         await jctx.mark_completed(job_id, result_data=result)
 
+        # Chain: refresh the AI analysis for this project now that the
+        # scan + audit rows are committed. Separate job so a slow LLM
+        # call never blocks the scan job's completion.
+        try:
+            from packages.common.redis.client import get_arq_redis
+            redis = await get_arq_redis()
+            await redis.enqueue_job("ai_analysis_job", str(product_id))
+        except Exception as chain_exc:
+            logger.warning(
+                "Scan job %s completed but failed to enqueue AI refresh: %s",
+                job_id, chain_exc,
+            )
+
     except Exception as exc:
         logger.exception("Scan job %s failed: %s", job_id, exc)
         await jctx.mark_failed(job_id, str(exc)[:500])

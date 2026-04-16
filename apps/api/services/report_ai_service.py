@@ -6,11 +6,17 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import redis.asyncio as aioredis
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.config import settings
+from apps.api.models.audit import Audit
+from apps.api.models.milestone import Milestone
+from apps.api.models.task import Task
 from apps.api.services.llm_config import get_llm_config
+from apps.api.services.project_report_pdf_health import compute_dev_health
 from apps.api.services.report_service import ReportService
+from apps.api.services.scan_service import ScanService
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +32,83 @@ class ReportAIService:
 
     async def generate_analysis(self, product_id: UUID) -> dict:
         """Generate AI analysis for a project, caching the result."""
-        report_svc = ReportService(self.session)
-        report = await report_svc.get_project_report(product_id)
+        report = await ReportService(self.session).get_project_report(product_id)
+        scan_result = await ScanService(self.session).get_latest_scan_result(product_id)
+        audit = await self._fetch_latest_audit(product_id)
+        bugs = await self._fetch_bug_summary(product_id)
+        milestones = await self._fetch_milestone_summary(product_id)
+        dev_health = compute_dev_health(scan_result, audit, None)
 
-        prompt = self._build_prompt(report)
+        prompt = self._build_prompt(report, scan_result, audit, bugs, milestones, dev_health)
         analysis = await self._call_llm(prompt)
         analysis["generated_at"] = datetime.now(timezone.utc).isoformat()
 
         await self._cache_set(product_id, analysis)
         return analysis
+
+    # ------------------------------------------------------------------
+    # Extra signal fetchers (scan / audit / bugs / milestones)
+    # ------------------------------------------------------------------
+
+    async def _fetch_latest_audit(self, product_id: UUID) -> Audit | None:
+        """Return the most recent audit that uses the new category schema."""
+        stmt = (
+            select(Audit)
+            .where(Audit.product_id == product_id)
+            .order_by(Audit.run_at.desc())
+            .limit(10)
+        )
+        result = await self.session.execute(stmt)
+        for row in result.scalars().all():
+            cats = row.categories if isinstance(row.categories, dict) else {}
+            if any(k in cats for k in ("dependencies", "code_quality", "hygiene")):
+                return row
+        return None
+
+    async def _fetch_bug_summary(self, product_id: UUID) -> dict:
+        stmt = select(Task).where(
+            Task.product_id == product_id, Task.task_type == "bug",
+        )
+        result = await self.session.execute(stmt)
+        rows = list(result.scalars().all())
+        by_status: dict[str, int] = {}
+        open_titles: list[str] = []
+        closed_set = {"fixed", "verified", "live", "closed"}
+        for b in rows:
+            key = (b.status or "reported").lower()
+            by_status[key] = by_status.get(key, 0) + 1
+            if key not in closed_set and len(open_titles) < 8:
+                open_titles.append(b.title)
+        return {"total": len(rows), "by_status": by_status, "open_titles": open_titles}
+
+    async def _fetch_milestone_summary(self, product_id: UUID) -> list[dict]:
+        done_statuses = {"done", "live", "completed"}
+        mstmt = (
+            select(Milestone)
+            .where(Milestone.product_id == product_id)
+            .order_by(Milestone.sort_order, Milestone.created_at)
+        )
+        tstmt = select(Task).where(
+            Task.product_id == product_id, Task.task_type == "task",
+        )
+        mresult = await self.session.execute(mstmt)
+        tresult = await self.session.execute(tstmt)
+        milestones = list(mresult.scalars().all())
+        tasks = list(tresult.scalars().all())
+        out: list[dict] = []
+        for m in milestones:
+            m_tasks = [t for t in tasks if t.milestone_id == m.id]
+            total = len(m_tasks)
+            done = sum(1 for t in m_tasks if (t.status or "").lower() in done_statuses)
+            pct = round((done / total) * 100) if total else 0
+            out.append({
+                "title": m.title,
+                "due_date": m.due_date.strftime("%Y-%m-%d") if m.due_date else None,
+                "done": done,
+                "total": total,
+                "pct": pct,
+            })
+        return out
 
     async def get_cached_analysis(self, product_id: UUID) -> dict | None:
         """Return cached analysis or None."""
@@ -76,7 +150,14 @@ class ReportAIService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_prompt(report: dict) -> str:
+    def _build_prompt(
+        report: dict,
+        scan_result,
+        audit: Audit | None,
+        bugs: dict,
+        milestones: list[dict],
+        dev_health: dict,
+    ) -> str:
         tm = report.get("task_metrics", {})
         fm = report.get("feature_metrics", {})
         gm = report.get("github_metrics") or {}
@@ -98,9 +179,16 @@ class ReportAIService:
             f"+{gm.get('total_lines_added', 0)}/-{gm.get('total_lines_removed', 0)} lines\n"
         )
 
-        task_section = _build_task_section(task_details)
-
-        return base + task_section + "\nAnalyze this project and respond with ONLY valid JSON."
+        return (
+            base
+            + _build_task_section(task_details)
+            + _build_scan_section(scan_result)
+            + _build_audit_section(audit)
+            + _build_dev_health_section(dev_health)
+            + _build_milestone_section(milestones)
+            + _build_bug_section(bugs)
+            + "\nAnalyze this project and respond with ONLY valid JSON."
+        )
 
     # ------------------------------------------------------------------
     # Redis cache
@@ -181,17 +269,118 @@ def _build_task_section(tasks: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _build_scan_section(scan_result) -> str:
+    """Code Evidence Scan summary: verified vs partial vs no-evidence tasks."""
+    if not scan_result:
+        return "\n\n--- CODE EVIDENCE SCAN --- (not run yet)"
+    ga = getattr(scan_result, "gap_analysis", None) or {}
+    inv = getattr(scan_result, "functional_inventory", None) or []
+    verified = ga.get("verified")
+    partial = ga.get("partial")
+    no_ev = ga.get("no_evidence")
+    total = ga.get("total_tasks")
+    pct = ga.get("progress_pct")
+    lines = ["\n\n--- CODE EVIDENCE SCAN ---"]
+    if total is not None:
+        lines.append(
+            f"Evidence progress: {pct}% ({verified} verified, {partial} partial, "
+            f"{no_ev} no-evidence of {total} tasks)",
+        )
+    if isinstance(inv, list) and inv:
+        gaps = [e for e in inv if isinstance(e, dict) and not (e.get("artifacts_found") or [])]
+        if gaps:
+            titles = [e.get("task_title") or e.get("task_id") for e in gaps[:5]]
+            lines.append(f"Tasks with no code artifacts: {', '.join(t for t in titles if t)}")
+    return "\n".join(lines)
+
+
+def _build_audit_section(audit) -> str:
+    """Security / dependencies / code-quality / hygiene scores + top findings."""
+    if not audit:
+        return "\n\n--- CODE AUDIT --- (no audit yet)"
+    cats = audit.categories if isinstance(audit.categories, dict) else {}
+    issues = audit.issues if isinstance(audit.issues, dict) else {}
+    critical = issues.get("critical") or []
+    warnings = issues.get("warnings") or []
+    lines = [
+        "\n\n--- CODE AUDIT ---",
+        f"Overall: {round(audit.overall_score)}",
+    ]
+    cat_bits = []
+    for k in ("security", "dependencies", "code_quality", "hygiene"):
+        v = cats.get(k)
+        if isinstance(v, (int, float)):
+            cat_bits.append(f"{k.replace('_', ' ')}={round(float(v))}")
+    if cat_bits:
+        lines.append("By category: " + ", ".join(cat_bits))
+    if critical:
+        top = [str((f or {}).get("title", ""))[:90] for f in critical[:3]]
+        lines.append("Top critical findings: " + " | ".join(t for t in top if t))
+    if warnings:
+        lines.append(f"Warnings outstanding: {len(warnings)}")
+    return "\n".join(lines)
+
+
+def _build_dev_health_section(dev_health: dict) -> str:
+    if not dev_health:
+        return ""
+    spec = dev_health.get("spec_alignment")
+    stand = dev_health.get("standards")
+    quality = dev_health.get("code_quality")
+    overall = dev_health.get("overall")
+    if all(v is None for v in (spec, stand, quality, overall)):
+        return ""
+
+    def _fmt(v):
+        return f"{int(v)}%" if isinstance(v, (int, float)) else "n/a"
+    return (
+        "\n\n--- DEVELOPMENT HEALTH ---\n"
+        f"Overall: {_fmt(overall)} | "
+        f"Spec Alignment: {_fmt(spec)} | "
+        f"Standards: {_fmt(stand)} | "
+        f"Code Quality: {_fmt(quality)}"
+    )
+
+
+def _build_milestone_section(milestones: list[dict]) -> str:
+    if not milestones:
+        return ""
+    lines = ["\n\n--- MILESTONES ---"]
+    for m in milestones[:10]:
+        due = m.get("due_date") or "no due date"
+        lines.append(
+            f"- {m.get('title')} ({m.get('done', 0)}/{m.get('total', 0)} tasks, "
+            f"{m.get('pct', 0)}%) due {due}",
+        )
+    return "\n".join(lines)
+
+
+def _build_bug_section(bugs: dict) -> str:
+    if not bugs or not bugs.get("total"):
+        return "\n\n--- BUGS --- (none reported)"
+    lines = [
+        "\n\n--- BUGS ---",
+        f"Total: {bugs.get('total', 0)}. Status: {json.dumps(bugs.get('by_status', {}))}",
+    ]
+    open_titles = bugs.get("open_titles") or []
+    if open_titles:
+        lines.append("Open bug titles: " + "; ".join(t[:80] for t in open_titles))
+    return "\n".join(lines)
+
+
 _SYSTEM_PROMPT = (
-    "You are a project health analyst. Given project metrics and individual task details, "
-    "produce a concise JSON analysis.\n"
+    "You are a project health analyst. You receive project metrics, task details, "
+    "a code-evidence scan, a static-analysis audit (security / dependencies / code quality / "
+    "project hygiene), development-health sub-scores, milestones, and bugs. Produce a "
+    "concise JSON analysis that integrates ALL of these signals, not just the task list.\n"
     "Return ONLY valid JSON with these keys:\n"
-    '- "health_assessment": 2-3 sentence overall health summary. '
-    "Reference specific task names when relevant.\n"
-    '- "risk_factors": array of 2-4 short risk strings. '
-    "Cite specific overdue or at-risk tasks by name.\n"
-    '- "recommendations": array of 2-4 actionable recommendation strings. '
-    "Reference specific tasks, assignees, or deadlines when possible.\n"
+    '- "health_assessment": 2-3 sentence overall health summary. Reference specific task '
+    "names, CVE counts, complexity hotspots, or milestone slippage when relevant.\n"
+    '- "risk_factors": array of 2-4 short risk strings. Cite specific overdue/at-risk '
+    "tasks, critical audit findings, unresolved bugs, or tasks with no code evidence.\n"
+    '- "recommendations": array of 2-4 actionable recommendations. Reference specific '
+    "tasks, assignees, deadlines, audit categories, or upcoming milestones when possible.\n"
     '- "dev_contribution_summary": 2-3 sentence summary of development progress '
-    "mentioning specific developer names and their task completion\n"
+    "mentioning developer names, task completion, and (if relevant) code evidence quality.\n"
     "No markdown fences. No explanation. Just JSON."
 )
