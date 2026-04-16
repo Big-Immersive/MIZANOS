@@ -41,6 +41,7 @@ interface AuditIssue {
   line?: number;
   rule?: string;
   tool?: string;
+  category?: string;
 }
 
 const CATEGORY_ICONS: Record<string, typeof FileCode> = {
@@ -226,10 +227,12 @@ function AuditHistoryItem({ audit, isLatest, canDelete, onDelete, isDeleting }: 
                         <span className="text-foreground">
                           {issue.title ?? issue.message ?? "No description"}
                         </span>
-                        {issue.file && (
+                        {(issue.file || (issue.tool && issue.tool !== issue.category)) && (
                           <p className="text-muted-foreground/70 truncate mt-0.5">
-                            {issue.file}{issue.line ? `:${issue.line}` : ""}
-                            {issue.tool ? ` · ${issue.tool}` : ""}
+                            {issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ""}` : ""}
+                            {issue.tool && issue.tool !== issue.category
+                              ? `${issue.file ? " · " : ""}${issue.tool}`
+                              : ""}
                           </p>
                         )}
                       </div>

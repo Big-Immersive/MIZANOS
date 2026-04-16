@@ -142,16 +142,48 @@ async def _recent_commits(repo: Path) -> int:
     return len([ln for ln in stdout.decode().splitlines() if ln.strip()])
 
 
-async def _contributor_count(repo: Path) -> int:
+async def _is_shallow_clone(repo: Path) -> bool:
+    """A shallow clone has .git/shallow present."""
+    return (repo / ".git" / "shallow").exists()
+
+
+async def _unshallow(repo: Path) -> bool:
+    """Try to fetch full history on a shallow clone. Returns True on success."""
     proc = await asyncio.create_subprocess_exec(
-        "git", "-C", str(repo), "shortlog", "-sn", "--all", "--no-merges",
+        "git", "-C", str(repo), "fetch", "--unshallow",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    await proc.communicate()
+    return proc.returncode == 0 and not (repo / ".git" / "shallow").exists()
+
+
+async def _contributor_count(repo: Path) -> int | None:
+    """Return the number of unique commit authors.
+
+    On a shallow clone `git shortlog --all` only sees the tip commit's
+    author, so it always reports 1 — a false positive for multi-person
+    repos. We try to un-shallow first; if that fails (network, timeout)
+    we return None so the hygiene score treats the check as N/A rather
+    than counting it as 'only one contributor'.
+    """
+    if await _is_shallow_clone(repo):
+        success = await _unshallow(repo)
+        if not success:
+            logger.info("hygiene: could not un-shallow repo, skipping contributor check")
+            return None
+
+    proc = await asyncio.create_subprocess_exec(
+        "git", "-C", str(repo), "log", "--all", "--no-merges",
+        "--pretty=format:%ae",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
     stdout, _ = await proc.communicate()
     if proc.returncode != 0:
-        return 0
-    return len([ln for ln in stdout.decode().splitlines() if ln.strip()])
+        return None
+    authors = {ln.strip().lower() for ln in stdout.decode().splitlines() if ln.strip()}
+    return len(authors)
 
 
 async def check_hygiene(repo_path: str) -> dict:
@@ -167,9 +199,18 @@ async def check_hygiene(repo_path: str) -> dict:
         )
     except Exception as exc:
         logger.warning("hygiene git stats failed: %s", exc)
-        commits_30d, contributors = 0, 0
+        commits_30d, contributors = 0, None
 
     dockerfile_applicable = _dockerfile_is_applicable(repo)
+
+    # contributors is None when the shallow clone could not be un-shallowed;
+    # treat that as N/A so the check doesn't produce a false-positive
+    # "only one contributor" finding.
+    contributor_check: bool | None
+    if contributors is None:
+        contributor_check = None
+    else:
+        contributor_check = contributors > 1
 
     checks: dict[str, bool | None] = {
         "readme": _has_nontrivial_readme(repo),
@@ -179,7 +220,7 @@ async def check_hygiene(repo_path: str) -> dict:
         "dockerfile": _has_dockerfile(repo) if dockerfile_applicable else None,
         "gitignore": _has_nontrivial_gitignore(repo),
         "recent_commits": commits_30d > 0,
-        "contributors": contributors > 1,
+        "contributors": contributor_check,
     }
 
     findings: list[dict] = []
@@ -205,8 +246,8 @@ async def check_hygiene(repo_path: str) -> dict:
         "raw_metrics": {
             "checks": {k: (v if v is not None else "n/a") for k, v in checks.items()},
             "dockerfile_applicable": dockerfile_applicable,
+            "contributor_count": contributors,  # None means "N/A — shallow clone"
             "commits_last_30_days": commits_30d,
-            "contributor_count": contributors,
             "tools_run": ["hygiene"],
         },
     }
