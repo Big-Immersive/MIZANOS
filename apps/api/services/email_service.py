@@ -1,5 +1,6 @@
 """Email service using Resend SDK."""
 
+import base64
 import logging
 
 from apps.api.config import settings
@@ -219,6 +220,65 @@ class EmailService:
             return True
         except Exception:
             logger.exception("Failed to send mention email to %s", to_email)
+            return False
+
+    @staticmethod
+    async def send_global_report_email(
+        to_emails: list[str],
+        pdf_bytes: bytes,
+        filename: str,
+        project_count: int,
+        warnings: list[str] | None = None,
+    ) -> bool:
+        """Send the nightly global multi-project PDF report as an attachment."""
+        if not settings.resend_api_key:
+            logger.warning("RESEND_API_KEY not set — skipping global report email")
+            return False
+        if not to_emails:
+            logger.warning("No recipients configured — skipping global report email")
+            return False
+
+        import resend
+
+        resend.api_key = settings.resend_api_key
+
+        warning_html = ""
+        if warnings:
+            items = "".join(f"<li>{w}</li>" for w in warnings)
+            warning_html = (
+                "<p style='color:#b45309'><strong>Notes:</strong></p>"
+                f"<ul style='color:#6b7280'>{items}</ul>"
+            )
+
+        html = (
+            "<h2>Mizan Daily Project Report</h2>"
+            f"<p>Attached is today's automated multi-project report covering "
+            f"<strong>{project_count}</strong> active project(s).</p>"
+            "<p>Each project section includes the latest code-evidence scan, "
+            "static-analysis audit (security / dependencies / code quality / hygiene), "
+            "development-health sub-scores, milestones, and AI analysis.</p>"
+            f"{warning_html}"
+            "<p style='color:#9ca3af;font-size:12px;margin-top:20px'>"
+            "Sent automatically by Mizan OS. Reply-to is not monitored."
+            "</p>"
+        )
+
+        attachment = {
+            "filename": filename,
+            "content": base64.b64encode(pdf_bytes).decode("ascii"),
+        }
+
+        try:
+            resend.Emails.send({
+                "from": settings.email_from,
+                "to": to_emails,
+                "subject": f"Mizan Daily Report — {project_count} project(s)",
+                "html": html,
+                "attachments": [attachment],
+            })
+            return True
+        except Exception:
+            logger.exception("Failed to send global report email to %s", to_emails)
             return False
 
     @staticmethod

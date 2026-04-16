@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # Email (Resend)
     resend_api_key: str = ""
     email_from: str = "Mizan <onboarding@resend.dev>"
+    # Comma-separated recipient list for the nightly global report PDF.
+    # Example: "rafay@bigimmersive.com,manager@bigimmersive.com"
+    global_report_email_to: str = ""
     app_base_url: str = "http://localhost:3006"
     api_base_url: str = "http://localhost:8000"
 
