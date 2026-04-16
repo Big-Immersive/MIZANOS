@@ -17,18 +17,27 @@ def security_score(
     low: int = 0,
     secrets_found: int = 0,
 ) -> int:
-    """Penalise by severity. Each critical ≈ 20 points off, high ≈ 10, etc.
-    Secrets in git history are weighted heavily — a single leaked key is
-    production-incident material.
+    """Penalise secrets + SAST findings by severity.
+
+    Dependency CVEs are deliberately NOT counted here anymore — they
+    drive Dependency Health alone so we don't double-ding the same
+    finding in two categories. Keep feeding only gitleaks (secrets) and
+    bandit (SAST) severity counts into this scorer.
+
+    Weights match CVSS intent: each critical is serious, a leaked secret
+    is production-incident material. Low-severity SAST findings are
+    soft-weighted so they never dominate the score by themselves.
+    Floors at 40 so a repo with many minor findings but no catastrophes
+    still shows a readable bar.
     """
     penalty = (
-        critical * 20
-        + high * 10
-        + medium * 3
-        + low * 1
+        critical * 8
+        + high * 3
+        + medium * 1
+        + low * 0.3
         + secrets_found * 15
     )
-    return _clamp(100 - penalty)
+    return _clamp(100 - penalty, lo=40)
 
 
 def dependency_score(
@@ -87,13 +96,45 @@ def code_quality_score(
     )
 
 
-def hygiene_score(checks: dict[str, bool]) -> int:
-    """Simple checklist percentage."""
-    total = len(checks)
-    if total == 0:
+# Weighted hygiene items. Heavy-weight items = real project health
+# signals (docs, CI, tests, recent activity). Light-weight items are
+# nice-to-have but commonly absent from private/internal repos
+# (LICENSE, Dockerfile, multiple contributors) and shouldn't dominate
+# the score when missing.
+HYGIENE_WEIGHTS: dict[str, int] = {
+    "readme": 20,
+    "ci_config": 20,
+    "tests_dir": 18,
+    "gitignore": 12,
+    "recent_commits": 12,
+    "license": 8,
+    "dockerfile": 5,
+    "contributors": 5,
+}
+
+
+def hygiene_score(checks: dict[str, bool | None]) -> int:
+    """Weighted hygiene score.
+
+    Each check key maps to a weight; total possible = sum of weights
+    for *applicable* checks. A value of None means "not applicable"
+    (e.g. no Dockerfile on a Vercel-deployed Next.js repo) and the
+    check is excluded from both numerator and denominator so the repo
+    isn't penalised for a non-requirement. Floors at 40 so a mostly
+    bare repo still shows a readable bar.
+    """
+    earned = 0
+    possible = 0
+    for key, passed in checks.items():
+        weight = HYGIENE_WEIGHTS.get(key, 10)
+        if passed is None:
+            continue  # check skipped as N/A
+        possible += weight
+        if passed:
+            earned += weight
+    if possible == 0:
         return 0
-    passed = sum(1 for v in checks.values() if v)
-    return _clamp((passed / total) * 100)
+    return _clamp((earned / possible) * 100, lo=40)
 
 
 def finding(
