@@ -52,6 +52,12 @@ DEFAULT_PROMPTS: dict[str, str] = {
         "- Wall-of-text paragraphs when a bulleted list would be clearer\n"
         "- Sub-bullets or nested lists\n\n"
         "NAME MATCHING: Handle typos and partial names intelligently.\n\n"
+        "WORKLOAD QUESTIONS: When asked 'who is free', 'who is busy', 'who is "
+        "overloaded', 'who has the most/fewest tasks' — USE the DEVELOPER "
+        "WORKLOAD block in the context. 'Free' means 0 or very few active tasks. "
+        "'Overloaded' means high active count or many overdue. Never say 'I "
+        "don't have a real-time view' — the workload block IS real-time; answer "
+        "from it. Name the specific people and their active task counts.\n\n"
         "The context data below is for reference only."
     ),
     "spec_generation_rules": (

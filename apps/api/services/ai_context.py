@@ -144,6 +144,41 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
             summary_lines.append(f"    {name}: {len(projs)} projects — {', '.join(projs)}")
     sections.append("\n".join(summary_lines))
 
+    # --- Developer Workload (pre-computed active task counts per assignee) ---
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    done_statuses = {"done", "live", "completed", "verified", "fixed"}
+    workload: dict[str, dict] = {}
+    for t in all_tasks:
+        if not t.assignee_id:
+            continue
+        profile = profile_map.get(t.assignee_id)
+        if not profile:
+            continue
+        name = profile.full_name or profile.email or "Unknown"
+        entry = workload.setdefault(name, {"active": 0, "overdue": 0, "total": 0, "role": profile.role or "member"})
+        entry["total"] += 1
+        if (t.status or "").lower() not in done_statuses:
+            entry["active"] += 1
+            if t.due_date:
+                dd = t.due_date if t.due_date.tzinfo else t.due_date.replace(tzinfo=timezone.utc)
+                if dd < now:
+                    entry["overdue"] += 1
+    for p in profiles:
+        nm = p.full_name or p.email or "Unknown"
+        workload.setdefault(nm, {"active": 0, "overdue": 0, "total": 0, "role": p.role or "member"})
+
+    workload_lines = [
+        "DEVELOPER WORKLOAD (pre-computed — use this to answer 'who is free', "
+        "'who has the most work', 'who is overloaded'):"
+    ]
+    for name, w in sorted(workload.items(), key=lambda x: (x[1]["active"], x[0])):
+        workload_lines.append(
+            f"  {name} ({w['role']}): {w['active']} active, "
+            f"{w['overdue']} overdue, {w['total']} total tasks"
+        )
+    sections.append("\n".join(workload_lines))
+
     return (
         "\n\n--- APPLICATION CONTEXT (complete knowledge) ---\n"
         + "\n\n".join(sections)
