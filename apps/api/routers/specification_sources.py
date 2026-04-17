@@ -139,7 +139,7 @@ async def enrich_all_sources(
                 resp = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"model": "anthropic/claude-sonnet-4", "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]},
+                    json={"model": "google/gemini-2.0-flash-001", "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]},
                 )
                 if resp.status_code != 200:
                     continue
@@ -196,7 +196,7 @@ async def enrich_source(
             resp = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": "anthropic/claude-sonnet-4", "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]},
+                json={"model": "google/gemini-2.0-flash-001", "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]},
             )
             if resp.status_code != 200:
                 return {"ai_summary": source.ai_summary, "message": f"AI error: {resp.status_code}"}

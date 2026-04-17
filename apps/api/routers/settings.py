@@ -215,7 +215,7 @@ async def get_ai_defaults(user: CurrentUser):
     return {
         "model_config": {
             "provider": "openrouter",
-            "model": "anthropic/claude-sonnet-4",
+            "model": "google/gemini-2.0-flash-001",
             "temperature": 0.7,
             "max_tokens": 4096,
         },
