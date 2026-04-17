@@ -18,7 +18,7 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
     from apps.api.models.audit import RepositoryAnalysis
     from apps.api.models.product import Product, ProductMember
     from apps.api.models.task import Task
-    from apps.api.models.user import Profile
+    from apps.api.models.user import Profile, UserRole
 
     sections: list[str] = []
 
@@ -26,10 +26,31 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
     profiles = list((await session.execute(
         select(Profile).where(Profile.status == "active")
     )).scalars().all())
+
+    # Pull every (user_id -> role) mapping from user_roles so we honor
+    # additional roles too (e.g. Rafay Majeed = engineer + project_manager).
+    user_roles_rows = list((await session.execute(
+        select(UserRole.user_id, UserRole.role)
+    )).all())
+    user_roles_map: dict[str, set[str]] = {}
+    for user_id, role in user_roles_rows:
+        if user_id and role:
+            user_roles_map.setdefault(str(user_id), set()).add(role)
+
+    # Build per-profile role set: start with user_roles, fall back to primary.
+    profile_roles: dict = {}
+    for p in profiles:
+        roles = set(user_roles_map.get(str(p.user_id), set()))
+        if p.role:
+            roles.add(p.role)
+        if not roles:
+            roles.add("member")
+        profile_roles[p.id] = roles
+
     members_by_role: dict[str, list[str]] = {}
     for p in profiles:
-        role = p.role or "member"
-        members_by_role.setdefault(role, []).append(p.full_name or p.email or "Unknown")
+        for r in profile_roles[p.id]:
+            members_by_role.setdefault(r, []).append(p.full_name or p.email or "Unknown")
 
     sections.append(f"TEAM: {len(profiles)} active members")
 
@@ -156,7 +177,7 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         if not profile:
             continue
         name = profile.full_name or profile.email or "Unknown"
-        entry = workload.setdefault(name, {"active": 0, "overdue": 0, "total": 0, "role": profile.role or "member"})
+        entry = workload.setdefault(name, {"active": 0, "overdue": 0, "total": 0, "profile_id": profile.id})
         entry["total"] += 1
         if (t.status or "").lower() not in done_statuses:
             entry["active"] += 1
@@ -166,11 +187,15 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
                     entry["overdue"] += 1
     for p in profiles:
         nm = p.full_name or p.email or "Unknown"
-        workload.setdefault(nm, {"active": 0, "overdue": 0, "total": 0, "role": p.role or "member"})
+        workload.setdefault(nm, {"active": 0, "overdue": 0, "total": 0, "profile_id": p.id})
 
+    # Group by role — a person with both `engineer` and `project_manager`
+    # appears in BOTH role sections.
     workload_by_role: dict[str, list[tuple[str, dict]]] = {}
     for name, w in workload.items():
-        workload_by_role.setdefault(w["role"], []).append((name, w))
+        roles = profile_roles.get(w.get("profile_id"), {"member"})
+        for role in roles:
+            workload_by_role.setdefault(role, []).append((name, w))
 
     workload_lines = [
         "WORKLOAD BY ROLE (pre-computed — use this to answer 'who is free', "
