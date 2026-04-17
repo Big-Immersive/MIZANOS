@@ -119,7 +119,7 @@ async def parse_with_ai(content: bytes, filename: str) -> dict[str, Any]:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "google/gemini-2.0-flash-001",
+                    "model": "openai/gpt-5.4-mini",
                     "max_tokens": 4096,
                     "messages": [
                         {"role": "user", "content": EXTRACTION_PROMPT + truncated},

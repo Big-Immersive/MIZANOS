@@ -215,7 +215,7 @@ async def get_ai_defaults(user: CurrentUser):
     return {
         "model_config": {
             "provider": "openrouter",
-            "model": "google/gemini-2.0-flash-001",
+            "model": "openai/gpt-5.4-mini",
             "temperature": 0.7,
             "max_tokens": 4096,
         },
