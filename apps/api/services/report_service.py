@@ -739,6 +739,8 @@ class ReportService:
 
         BUG_STATUS_ORDER = ["reported", "triaging", "in_progress", "reopened", "fixed", "verified", "wont_fix", "live"]
 
+        links_map = await self._fetch_project_links(product_ids)
+
         result: dict[UUID, dict] = {}
 
         for pid in product_ids:
@@ -799,7 +801,7 @@ class ReportService:
                 "summary_line": summary,
                 "milestones": sorted_groups,
                 "has_multiple_assignees": True,
-                "links": [],
+                "links": links_map.get(pid, []),
                 "code_progress": 0.0,
             }
 
