@@ -18,7 +18,7 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
     from apps.api.models.audit import RepositoryAnalysis
     from apps.api.models.product import Product, ProductMember
     from apps.api.models.task import Task
-    from apps.api.models.user import Profile
+    from apps.api.models.user import Profile, UserRole
 
     sections: list[str] = []
 
@@ -26,10 +26,31 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
     profiles = list((await session.execute(
         select(Profile).where(Profile.status == "active")
     )).scalars().all())
+
+    # Pull every (user_id -> role) mapping from user_roles so we honor
+    # additional roles too (e.g. Rafay Majeed = engineer + project_manager).
+    user_roles_rows = list((await session.execute(
+        select(UserRole.user_id, UserRole.role)
+    )).all())
+    user_roles_map: dict[str, set[str]] = {}
+    for user_id, role in user_roles_rows:
+        if user_id and role:
+            user_roles_map.setdefault(str(user_id), set()).add(role)
+
+    # Build per-profile role set: start with user_roles, fall back to primary.
+    profile_roles: dict = {}
+    for p in profiles:
+        roles = set(user_roles_map.get(str(p.user_id), set()))
+        if p.role:
+            roles.add(p.role)
+        if not roles:
+            roles.add("member")
+        profile_roles[p.id] = roles
+
     members_by_role: dict[str, list[str]] = {}
     for p in profiles:
-        role = p.role or "member"
-        members_by_role.setdefault(role, []).append(p.full_name or p.email or "Unknown")
+        for r in profile_roles[p.id]:
+            members_by_role.setdefault(r, []).append(p.full_name or p.email or "Unknown")
 
     sections.append(f"TEAM: {len(profiles)} active members")
 
@@ -143,6 +164,108 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         for name, projs in sorted_members:
             summary_lines.append(f"    {name}: {len(projs)} projects — {', '.join(projs)}")
     sections.append("\n".join(summary_lines))
+
+    # --- Developer Workload (pre-computed active task counts per assignee) ---
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    done_statuses = {"done", "live", "completed", "verified", "fixed"}
+
+    # Pre-compute project membership count per profile
+    project_count_by_profile: dict = {}
+    for m in all_members:
+        project_count_by_profile[m.profile_id] = project_count_by_profile.get(m.profile_id, 0) + 1
+
+    workload: dict[str, dict] = {}
+    for t in all_tasks:
+        if not t.assignee_id:
+            continue
+        profile = profile_map.get(t.assignee_id)
+        if not profile:
+            continue
+        name = profile.full_name or profile.email or "Unknown"
+        entry = workload.setdefault(name, {
+            "active": 0, "overdue": 0, "total": 0,
+            "profile_id": profile.id,
+            "projects": project_count_by_profile.get(profile.id, 0),
+        })
+        entry["total"] += 1
+        if (t.status or "").lower() not in done_statuses:
+            entry["active"] += 1
+            if t.due_date:
+                dd = t.due_date if t.due_date.tzinfo else t.due_date.replace(tzinfo=timezone.utc)
+                if dd < now:
+                    entry["overdue"] += 1
+    for p in profiles:
+        nm = p.full_name or p.email or "Unknown"
+        workload.setdefault(nm, {
+            "active": 0, "overdue": 0, "total": 0,
+            "profile_id": p.id,
+            "projects": project_count_by_profile.get(p.id, 0),
+        })
+
+    # Group by role — a person with both `engineer` and `project_manager`
+    # appears in BOTH role sections.
+    workload_by_role: dict[str, list[tuple[str, dict]]] = {}
+    for name, w in workload.items():
+        roles = profile_roles.get(w.get("profile_id"), {"member"})
+        for role in roles:
+            workload_by_role.setdefault(role, []).append((name, w))
+
+    workload_lines = [
+        "WORKLOAD BY ROLE (pre-computed — use this to answer workload + "
+        "project-assignment questions). When the user asks about a specific "
+        "role (engineers, developers, PMs, project managers, operations, "
+        "marketing), ONLY list people from that role section.",
+        "'engineer' = developer / AI engineer. 'project_manager' = PM.",
+        "",
+        "TERMINOLOGY — these are DIFFERENT, do not conflate:",
+        "- 'Free' / 'available for work' / 'has capacity' = 0 active AND 0 "
+        "overdue TASKS (workload-based). Someone can be free but still be a "
+        "member of a project.",
+        "- 'No project assigned' / 'unassigned to projects' / 'not on a "
+        "project' / 'no current project' = 0 PROJECT MEMBERSHIPS "
+        "(membership-based). Someone can have 0 projects but still have old "
+        "tasks from past work.",
+        "- 'Overloaded' = high active count or many overdue.",
+        "",
+        "EXACT COUNTS (cite these verbatim — do not recount):",
+    ]
+    for role in sorted(workload_by_role.keys()):
+        people = workload_by_role[role]
+        free_count = sum(1 for _, w in people if w["active"] == 0 and w["overdue"] == 0)
+        busy_count = len(people) - free_count
+        unassigned_count = sum(1 for _, w in people if w.get("projects", 0) == 0)
+        workload_lines.append(
+            f"  {role}: {len(people)} total — {free_count} free (no active tasks), "
+            f"{busy_count} busy, {unassigned_count} unassigned to any project"
+        )
+
+    workload_lines.append("")
+    workload_lines.append("DETAIL:")
+    for role in sorted(workload_by_role.keys()):
+        people = sorted(workload_by_role[role], key=lambda x: (x[1]["active"], x[0]))
+        free_people = [(n, w) for n, w in people if w["active"] == 0 and w["overdue"] == 0]
+        busy_people = [(n, w) for n, w in people if not (w["active"] == 0 and w["overdue"] == 0)]
+        unassigned_people = [(n, w) for n, w in people if w.get("projects", 0) == 0]
+        workload_lines.append(f"  {role} ({len(people)} people):")
+        workload_lines.append(f"    FREE — 0 active tasks ({len(free_people)}):")
+        for name, w in free_people:
+            workload_lines.append(
+                f"      - {name} (0 active, 0 overdue, {w['total']} total historical, "
+                f"{w.get('projects', 0)} project memberships)"
+            )
+        workload_lines.append(f"    BUSY — has active tasks ({len(busy_people)}):")
+        for name, w in busy_people:
+            workload_lines.append(
+                f"      - {name} ({w['active']} active, {w['overdue']} overdue, "
+                f"{w.get('projects', 0)} project memberships)"
+            )
+        workload_lines.append(f"    UNASSIGNED TO ANY PROJECT — 0 project memberships ({len(unassigned_people)}):")
+        for name, w in unassigned_people:
+            workload_lines.append(
+                f"      - {name} ({w['active']} active tasks, {w['overdue']} overdue)"
+            )
+    sections.append("\n".join(workload_lines))
 
     return (
         "\n\n--- APPLICATION CONTEXT (complete knowledge) ---\n"

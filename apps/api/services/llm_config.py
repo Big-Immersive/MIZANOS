@@ -52,6 +52,35 @@ DEFAULT_PROMPTS: dict[str, str] = {
         "- Wall-of-text paragraphs when a bulleted list would be clearer\n"
         "- Sub-bullets or nested lists\n\n"
         "NAME MATCHING: Handle typos and partial names intelligently.\n\n"
+        "WORKLOAD / ASSIGNMENT QUESTIONS: USE the WORKLOAD BY ROLE block. "
+        "Pay close attention to WHICH question the user is asking — these are "
+        "DIFFERENT questions with DIFFERENT answers:\n"
+        "- 'Who is free?' / 'who has capacity?' / 'who is available for work?' "
+        "→ use the FREE sub-list (0 active AND 0 overdue tasks).\n"
+        "- 'Who has no project assigned?' / 'who is not on a project?' / "
+        "'who has no current project?' / 'unassigned engineers?' → use the "
+        "UNASSIGNED TO ANY PROJECT sub-list (0 project memberships). This is "
+        "NOT the same as 'free'. Do not use the FREE list for this question.\n"
+        "- 'Who is overloaded?' / 'who has the most work?' → use the BUSY "
+        "sub-list, sorted by active + overdue counts descending.\n"
+        "- COUNTING RULE (CRITICAL): when asked 'how many X are Y' (e.g. "
+        "'how many developers are free'), you MUST scan the ENTIRE relevant "
+        "role section, count ALL matching people, and state that exact number. "
+        "Never sample the first few, never guess, never round down. "
+        "If 7 people match, say 7 and list all 7.\n"
+        "- LISTING RULE: when you state a count, list ALL matching people "
+        "(up to the 15-bullet cap). If the answer is '7 engineers are free', "
+        "the reply must have 7 bullets naming each person. Do NOT truncate to "
+        "3 or 5 for brevity.\n"
+        "- If the user asks about a specific role (e.g. 'AI engineers', "
+        "'developers', 'devs', 'PMs', 'project managers', 'operations', "
+        "'marketing'), ONLY list people from that role section.\n"
+        "  - 'AI engineer' / 'developer' / 'dev' → role `engineer`\n"
+        "  - 'PM' / 'project manager' → role `project_manager`\n"
+        "- Never mix roles. If the user asked about engineers, do NOT include "
+        "project_manager / operations / marketing / etc.\n"
+        "- Never say 'I don't have a real-time view' — the workload block IS "
+        "real-time; answer from it.\n\n"
         "The context data below is for reference only."
     ),
     "spec_generation_rules": (
@@ -136,7 +165,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
         "https://openrouter.ai/api/v1" if settings.openrouter_api_key else None
     )
     default_model = (
-        "google/gemini-2.0-flash-001" if settings.openrouter_api_key else "gpt-4o"
+        "openai/gpt-5.4-mini" if settings.openrouter_api_key else "gpt-4o"
     )
 
     org_cfg = await _read_org_setting(session, "ai_model_config")

@@ -34,6 +34,12 @@ const TIER_BADGE: Record<string, { label: string; className: string }> = {
 
 const OPENROUTER_MODELS: ModelOption[] = [
   {
+    value: "openai/gpt-5.4-mini",
+    label: "GPT-5.4 Mini",
+    tier: "standard",
+    description: "Strong reasoning, 400K context — Mizan default",
+  },
+  {
     value: "anthropic/claude-sonnet-4",
     label: "Claude Sonnet 4",
     tier: "standard",
@@ -85,7 +91,7 @@ const OPENROUTER_MODELS: ModelOption[] = [
     value: "google/gemini-2.0-flash-001",
     label: "Gemini 2.0 Flash",
     tier: "budget",
-    description: "Cheapest stable Gemini — Mizan default",
+    description: "Cheapest stable Gemini — budget fallback",
   },
   {
     value: "deepseek/deepseek-r1",
@@ -96,6 +102,12 @@ const OPENROUTER_MODELS: ModelOption[] = [
 ];
 
 const OPENAI_MODELS: ModelOption[] = [
+  {
+    value: "gpt-5.4-mini",
+    label: "GPT-5.4 Mini",
+    tier: "standard",
+    description: "Strong reasoning, 400K context — recommended",
+  },
   {
     value: "gpt-4o",
     label: "GPT-4o",
