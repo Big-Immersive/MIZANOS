@@ -168,15 +168,26 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         nm = p.full_name or p.email or "Unknown"
         workload.setdefault(nm, {"active": 0, "overdue": 0, "total": 0, "role": p.role or "member"})
 
+    workload_by_role: dict[str, list[tuple[str, dict]]] = {}
+    for name, w in workload.items():
+        workload_by_role.setdefault(w["role"], []).append((name, w))
+
     workload_lines = [
-        "DEVELOPER WORKLOAD (pre-computed — use this to answer 'who is free', "
-        "'who has the most work', 'who is overloaded'):"
+        "WORKLOAD BY ROLE (pre-computed — use this to answer 'who is free', "
+        "'who has the most work', 'who is overloaded'). When the user asks "
+        "about a specific role (engineers, developers, PMs, project managers, "
+        "operations, marketing), ONLY list people from that role section. "
+        "'engineer' = developer / AI engineer. 'project_manager' = PM. "
+        "'Free' means 0 active AND 0 overdue tasks:"
     ]
-    for name, w in sorted(workload.items(), key=lambda x: (x[1]["active"], x[0])):
-        workload_lines.append(
-            f"  {name} ({w['role']}): {w['active']} active, "
-            f"{w['overdue']} overdue, {w['total']} total tasks"
-        )
+    for role in sorted(workload_by_role.keys()):
+        people = sorted(workload_by_role[role], key=lambda x: (x[1]["active"], x[0]))
+        workload_lines.append(f"  {role} ({len(people)} people):")
+        for name, w in people:
+            workload_lines.append(
+                f"    {name}: {w['active']} active, "
+                f"{w['overdue']} overdue, {w['total']} total tasks"
+            )
     sections.append("\n".join(workload_lines))
 
     return (
