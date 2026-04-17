@@ -178,15 +178,34 @@ async def _gather_all_projects_context(session: AsyncSession) -> str:
         "about a specific role (engineers, developers, PMs, project managers, "
         "operations, marketing), ONLY list people from that role section. "
         "'engineer' = developer / AI engineer. 'project_manager' = PM. "
-        "'Free' means 0 active AND 0 overdue tasks:"
+        "'Free' means 0 active AND 0 overdue tasks.",
+        "",
+        "EXACT COUNTS (cite these verbatim — do not recount):",
     ]
     for role in sorted(workload_by_role.keys()):
+        people = workload_by_role[role]
+        free_count = sum(1 for _, w in people if w["active"] == 0 and w["overdue"] == 0)
+        busy_count = len(people) - free_count
+        workload_lines.append(
+            f"  {role}: {len(people)} total — {free_count} free, {busy_count} busy"
+        )
+
+    workload_lines.append("")
+    workload_lines.append("DETAIL:")
+    for role in sorted(workload_by_role.keys()):
         people = sorted(workload_by_role[role], key=lambda x: (x[1]["active"], x[0]))
+        free_people = [(n, w) for n, w in people if w["active"] == 0 and w["overdue"] == 0]
+        busy_people = [(n, w) for n, w in people if not (w["active"] == 0 and w["overdue"] == 0)]
         workload_lines.append(f"  {role} ({len(people)} people):")
-        for name, w in people:
+        workload_lines.append(f"    FREE ({len(free_people)}):")
+        for name, w in free_people:
             workload_lines.append(
-                f"    {name}: {w['active']} active, "
-                f"{w['overdue']} overdue, {w['total']} total tasks"
+                f"      - {name} (0 active, 0 overdue, {w['total']} total historical)"
+            )
+        workload_lines.append(f"    BUSY ({len(busy_people)}):")
+        for name, w in busy_people:
+            workload_lines.append(
+                f"      - {name} ({w['active']} active, {w['overdue']} overdue)"
             )
     sections.append("\n".join(workload_lines))
 
