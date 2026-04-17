@@ -144,8 +144,13 @@ export function IntakeForm() {
         .join("\n");
 
       const session = await aiRepository.createSession();
-      const response = await aiRepository.sendMessage(session.id, prompt, images.length > 0 ? images : undefined);
-      const content = response.content ?? "";
+      let content = "";
+      try {
+        const response = await aiRepository.sendMessage(session.id, prompt, images.length > 0 ? images : undefined);
+        content = response.content ?? "";
+      } finally {
+        aiRepository.deleteSession(session.id).catch(() => {});
+      }
 
       let parsed: GeneratedSpec;
       try {
