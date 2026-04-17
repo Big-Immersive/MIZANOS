@@ -144,13 +144,9 @@ async def enrich_all_sources(
                 if resp.status_code != 200:
                     continue
 
-                raw = resp.json()["choices"][0]["message"]["content"].strip()
-                if raw.startswith("```"):
-                    raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                    if raw.endswith("```"):
-                        raw = raw[:-3]
-
-                source.ai_summary = json.loads(raw)
+                from packages.common.utils.json_utils import extract_json_text
+                raw = resp.json()["choices"][0]["message"]["content"]
+                source.ai_summary = json.loads(extract_json_text(raw))
                 enriched_count += 1
         except Exception:
             continue
@@ -205,13 +201,9 @@ async def enrich_source(
             if resp.status_code != 200:
                 return {"ai_summary": source.ai_summary, "message": f"AI error: {resp.status_code}"}
 
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                if raw.endswith("```"):
-                    raw = raw[:-3]
-
-            enriched = json.loads(raw)
+            from packages.common.utils.json_utils import extract_json_text
+            raw = resp.json()["choices"][0]["message"]["content"]
+            enriched = json.loads(extract_json_text(raw))
             source.ai_summary = enriched
             await db.flush()
             return {"ai_summary": enriched, "message": "Enriched successfully"}

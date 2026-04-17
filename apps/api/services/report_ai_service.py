@@ -134,12 +134,14 @@ class ReportAIService:
             max_tokens=768,
         )
         raw = response.choices[0].message.content or "{}"
+        from packages.common.utils.json_utils import extract_json_text
+        cleaned = extract_json_text(raw)
         try:
-            return json.loads(raw)
+            return json.loads(cleaned)
         except json.JSONDecodeError:
             logger.warning("AI returned non-JSON, wrapping as health_assessment")
             return {
-                "health_assessment": raw,
+                "health_assessment": cleaned or raw,
                 "risk_factors": [],
                 "recommendations": [],
                 "dev_contribution_summary": "",
