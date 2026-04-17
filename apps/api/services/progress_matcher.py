@@ -167,12 +167,9 @@ class ProgressMatcherService:
     @staticmethod
     def _parse_response(raw: str, total_tasks: int) -> dict:
         """Parse the LLM JSON response, falling back gracefully."""
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
+        from packages.common.utils.json_utils import extract_json_text
+
+        cleaned = extract_json_text(raw)
 
         try:
             result = json.loads(cleaned)

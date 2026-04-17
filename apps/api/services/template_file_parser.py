@@ -131,14 +131,9 @@ async def parse_with_ai(content: bytes, filename: str) -> dict[str, Any]:
                 return {"template_name": filename, "template_type": "general", "items": []}
 
             data = response.json()
-            raw = data["choices"][0]["message"]["content"].strip()
-            # Clean markdown fences if present
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-                if raw.endswith("```"):
-                    raw = raw[:-3]
-
-            result = json.loads(raw)
+            from packages.common.utils.json_utils import extract_json_text
+            raw = data["choices"][0]["message"]["content"]
+            result = json.loads(extract_json_text(raw))
             return {
                 "template_name": result.get("template_name", filename),
                 "template_type": result.get("template_type", "general"),

@@ -84,7 +84,8 @@ async def fill_missing_descriptions(
             max_tokens=1024,
         )
         raw = response.choices[0].message.content or "{}"
-        data = json.loads(raw)
+        from packages.common.utils.json_utils import extract_json_text
+        data = json.loads(extract_json_text(raw))
         descriptions = data.get("descriptions", {})
 
         for f in missing:

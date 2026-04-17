@@ -123,7 +123,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
         "https://openrouter.ai/api/v1" if settings.openrouter_api_key else None
     )
     default_model = (
-        "anthropic/claude-sonnet-4" if settings.openrouter_api_key else "gpt-4o"
+        "google/gemini-2.0-flash-001" if settings.openrouter_api_key else "gpt-4o"
     )
 
     org_cfg = await _read_org_setting(session, "ai_model_config")

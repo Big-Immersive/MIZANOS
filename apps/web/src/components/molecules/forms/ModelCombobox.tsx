@@ -82,6 +82,12 @@ const OPENROUTER_MODELS: ModelOption[] = [
     description: "Fast Google model, great value",
   },
   {
+    value: "google/gemini-2.0-flash-001",
+    label: "Gemini 2.0 Flash",
+    tier: "budget",
+    description: "Cheapest stable Gemini — Mizan default",
+  },
+  {
     value: "deepseek/deepseek-r1",
     label: "DeepSeek R1",
     tier: "budget",
