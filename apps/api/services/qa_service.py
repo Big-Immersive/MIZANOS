@@ -70,7 +70,8 @@ class QAService(BaseService[QACheck]):
             )
 
             content = response.choices[0].message.content or "[]"
-            items = json.loads(content)
+            from packages.common.utils.json_utils import extract_json_text
+            items = json.loads(extract_json_text(content))
 
             checks: list[QACheck] = []
             for item in items:

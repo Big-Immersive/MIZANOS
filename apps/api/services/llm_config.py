@@ -28,16 +28,26 @@ DEFAULT_PROMPTS: dict[str, str] = {
         "- If user asks 'who is X?' just answer that. Do not also answer previous questions.\n"
         "- WRONG: Combining answers to multiple questions in one response.\n"
         "- RIGHT: Short, focused answer to only the latest question.\n\n"
+        "FORMATTING (rendered as Markdown in the UI):\n"
+        "- When listing items (tasks, bugs, people, statuses), ALWAYS use a bulleted list with `- ` at the start of each line.\n"
+        "- Use **bold** for names, numbers, statuses, and key facts.\n"
+        "- When comparing or summarising, use short bullets — NOT long paragraphs.\n"
+        "- Keep each bullet to one line. No sub-bullets. No nested lists.\n"
+        "- Start with a one-line summary sentence, then the bullets.\n"
+        "- Leave a blank line between the summary and the bullets so Markdown renders correctly.\n\n"
         "RESPONSE LENGTH:\n"
-        "- 'Who is X?' → 2-3 lines max (name, role, project)\n"
-        "- 'How many tasks?' → 1-2 lines (number and breakdown)\n"
-        "- 'Status of X?' → 2-3 lines (stage, completion, blockers)\n"
-        "- Simple questions get simple answers. No essays.\n\n"
+        "- 'Who is X?' → 1 bold name + 1-2 lines of role/project detail. No bullets needed.\n"
+        "- 'How many tasks?' → 1-line summary, then a short bulleted breakdown by status.\n"
+        "- 'Status of X?' → 1-line status summary, then 2-4 bullets for stage / completion / blockers.\n"
+        "- 'Tell me the tasks' / 'list bugs' → 1-line intro, then a bulleted list of items (one per bullet).\n"
+        "- Simple questions get simple answers. Bulleted answers stay short.\n\n"
         "FORBIDDEN:\n"
         "- JSON, code blocks, { } [ ] characters\n"
         "- Repeating previous answers\n"
         "- 'Note:', 'Additionally:', 'Also:', 'Furthermore:'\n"
-        "- Answering questions the user didn't ask\n\n"
+        "- Answering questions the user didn't ask\n"
+        "- Wall-of-text paragraphs when a bulleted list would be clearer\n"
+        "- Sub-bullets or nested lists\n\n"
         "NAME MATCHING: Handle typos and partial names intelligently.\n\n"
         "The context data below is for reference only."
     ),
@@ -123,7 +133,7 @@ async def get_llm_config(session: AsyncSession) -> LLMConfig:
         "https://openrouter.ai/api/v1" if settings.openrouter_api_key else None
     )
     default_model = (
-        "anthropic/claude-sonnet-4" if settings.openrouter_api_key else "gpt-4o"
+        "google/gemini-2.0-flash-001" if settings.openrouter_api_key else "gpt-4o"
     )
 
     org_cfg = await _read_org_setting(session, "ai_model_config")
@@ -171,6 +181,11 @@ _CHAT_FORMAT_RULE = (
     "your reply in plain English sentences. You are a chat assistant, NOT a spec "
     "generator. Never output fields like qaChecklist, nonFunctionalRequirements, "
     "features, techStack, or acceptance_criteria.\n\n"
+    "FORMATTING: the UI renders your reply as Markdown. When the answer is a list "
+    "(tasks, bugs, people, statuses), use bulleted lines starting with '- '. Use "
+    "**bold** for names, numbers, and statuses. Put a one-line summary first, then "
+    "a blank line, then the bullets. Keep bullets to one line each — no nesting. "
+    "Prefer a short bulleted list over a long paragraph.\n\n"
 )
 
 

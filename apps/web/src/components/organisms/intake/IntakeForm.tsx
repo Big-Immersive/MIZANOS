@@ -9,6 +9,7 @@ import { Button } from "@/components/molecules/buttons/Button";
 import { useIntakeSubmit } from "@/hooks/features/useIntakeSubmit";
 import { aiRepository } from "@/lib/api/repositories";
 import { useProducts } from "@/hooks/queries/useProducts";
+import { extractJsonText } from "@/lib/utils/jsonExtract";
 import { StepIndicator } from "@/components/molecules/intake/StepIndicator";
 
 import { IntakeBasicInfo } from "./IntakeBasicInfo";
@@ -148,7 +149,7 @@ export function IntakeForm() {
 
       let parsed: GeneratedSpec;
       try {
-        const raw = JSON.parse(content);
+        const raw = JSON.parse(extractJsonText(content));
         parsed = {
           summary: raw.summary ?? content.slice(0, 500),
           functionalSpec: raw.functionalSpec ?? { userStories: [], businessRules: [], acceptanceCriteria: [] },

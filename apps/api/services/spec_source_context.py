@@ -200,7 +200,9 @@ def build_spec_prompt(
 
 def parse_spec_response(content: str) -> dict:
     """Parse LLM response JSON with fallback defaults."""
-    raw = json.loads(content)
+    from packages.common.utils.json_utils import extract_json_text
+
+    raw = json.loads(extract_json_text(content))
     return {
         "summary": raw.get("summary", ""),
         "functionalSpec": raw.get("functionalSpec", {
